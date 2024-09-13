@@ -24,7 +24,6 @@ const Main = ({ userRole }) => {
       try {
         const response = await axios.get('/api/exam');
         setExams(response.data);
-        console.log(response.data);
       } catch (error) {
         console.error('Error fetching exams:', error);
       }
@@ -46,23 +45,24 @@ const Main = ({ userRole }) => {
 
   const isAccessibleToStudent = (exam) => {
     // Check if the student's information exists in the exam answers
-    const hasAnswered = exam.answers.some((userInfo) => 
-      (userInfo.lastName === lastname && userInfo.firstName === firstname) ||
-      userInfo.number === number
+    const hasAnswered = exam.answers.some(
+      (answer) =>
+        (answer.userInfo.lastName === lastname && answer.userInfo.firstName === firstname) ||
+        answer.userInfo.number === number
     );
-  
+
     // Check if the student has access to the exam
     const hasAccess = exam.access.some(
       (accessEntry) =>
         Object.keys(accessEntry)[0] === school &&
         Object.values(accessEntry)[0] === className
     );
-  
+
     // Return true if the student has not answered yet and has access
     return !hasAnswered && hasAccess;
   };
-  
-  
+
+
 
   const isOwnedByProfessor = (exam) => {
     return userRole === 'professeur' && exam.creator._id === profId;

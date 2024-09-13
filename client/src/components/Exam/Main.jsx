@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useParams } from 'react-router-dom';
 import { v4 } from 'uuid';
 import axios from 'axios';
@@ -12,6 +13,7 @@ import ExamRLE from './ExamRLE';
 import ExamOLE from './ExamOLE';
 
 const Main = ({ userRole }) => {
+    const navigate = useNavigate();
     const [exam, setExam] = useState(null);
     const [isCompleted, setIsCompleted] = useState(false);
     const [details, setDetails] = useState({});
@@ -98,6 +100,23 @@ const Main = ({ userRole }) => {
 
         createDocument();
     }, [isCompleted, exam, totalScore, school, className, lastname, firstname, number]);
+
+    useEffect(() => {
+        // Check if the exam is completed and redirect on reload
+        const handleBeforeUnload = (e) => {
+            if (isCompleted) {
+                e.preventDefault();
+                navigate('/');
+                return ''; // Required for some browsers
+            }
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+        };
+    }, [isCompleted, navigate]);
 
     useEffect(() => {
         const updateExamAnswer = async () => {
