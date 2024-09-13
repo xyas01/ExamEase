@@ -850,7 +850,7 @@ async function createPDF({ examName, module, note, school, className, year, last
     });
 
     // Save PDF to file
-    const dir = path.join(__dirname, 'files', examName, school, className);
+    const dir = path.join(__dirname, 'files', niveau, examName, school, className);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
