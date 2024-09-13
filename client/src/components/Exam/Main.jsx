@@ -106,6 +106,7 @@ const Main = ({ userRole }) => {
         const handleBeforeUnload = (e) => {
             if (isCompleted) {
                 e.preventDefault();
+                localStorage.clear();
                 navigate('/');
                 return ''; // Required for some browsers
             }
