@@ -3,7 +3,7 @@ const fontkit = require('@pdf-lib/fontkit');
 const fs = require('fs');
 const path = require('path');
 
-async function createPDF({ examName, module,niveau, note, school, className, year, lastName, firstName, number, parties, studentQCM, studentCLD, studentCLT, studentRPF, studentRLV, studentRLE, studentOLE }) {
+async function createPDF({ examName, module, niveau, note, school, className, year, lastName, firstName, number, parties, studentQCM, studentCLD, studentCLT, studentRPF, studentRLV, studentRLE, studentOLE }) {
   try {
     const pdfDoc = await PDFDocument.create();
     const timesRomanBoldFont = await pdfDoc.embedFont(StandardFonts.TimesRomanBold);

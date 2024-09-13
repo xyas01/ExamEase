@@ -67,6 +67,7 @@ const Main = ({ userRole }) => {
                     const payload = {
                         examName: exam.name,
                         module: exam.module || '',
+                        niveau: exam.niveau,
                         note: totalScore,
                         school: school,
                         className: className,
