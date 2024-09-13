@@ -115,7 +115,7 @@ const Main = ({ userRole }) => {
         return () => {
             window.removeEventListener('beforeunload', handleBeforeUnload);
         };
-    }, [isCompleted, navigate]);
+    }, [isCompleted]);
 
     useEffect(() => {
         const updateExamAnswer = async () => {
