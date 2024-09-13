@@ -12,6 +12,7 @@ const ExamSchema = new mongoose.Schema({
     required: true,
   },
   module: String,
+  niveau: String,
   parties: [
     {
       name: {

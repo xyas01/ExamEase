@@ -6,7 +6,7 @@ import axios from 'axios';
 const ExamCard = ({ exam, profId, onClose }) => {
   const [examName, setExamName] = useState(exam ? exam.name : '');
   const [module, setModule] = useState(exam ? exam.module : '');
-  const [niveau, setNiveau] = useState('lycee'); // New state for selecting Niveau
+  const [niveau, setNiveau] = useState(exam ? exam.niveau : '1AC'); // New state for selecting Niveau
   const [selectedLycees, setSelectedLycees] = useState(
     exam ? exam.access.map(a => Object.keys(a)[0]) : []
   );
@@ -97,7 +97,7 @@ const ExamCard = ({ exam, profId, onClose }) => {
 
     try {
       if (exam) {
-        const response = await axios.put(`/api/exam/${exam._id}`, { name: examName, module, access });
+        const response = await axios.put(`/api/exam/${exam._id}`, { name: examName, module, niveau, access });
         if (response.status === 200) {
           alert("Examen modifié avec succès");
           onClose();
@@ -106,6 +106,7 @@ const ExamCard = ({ exam, profId, onClose }) => {
         const response = await axios.post('/api/exam', {
           name: examName,
           module,
+          niveau,
           creator: localStorage.getItem('teacherId'),
           access,
         });
@@ -145,23 +146,56 @@ const ExamCard = ({ exam, profId, onClose }) => {
                 <input
                   type="radio"
                   name="niveau"
-                  value="lycee"
+                  value="1AC"
                   className='mr-2'
-                  checked={niveau === 'lycee'}
-                  onChange={() => setNiveau('lycee')}
+                  checked={niveau === '1AC'}
+                  onChange={() => setNiveau('1AC')}
                 />
-                Lycée
+                1AC
               </label>
               <label>
                 <input
                   type="radio"
                   name="niveau"
-                  value="college"
+                  value="2AC"
                   className='mr-2'
-                  checked={niveau === 'college'}
-                  onChange={() => setNiveau('college')}
+                  checked={niveau === '2AC'}
+                  onChange={() => setNiveau('2AC')}
                 />
-                Collège
+                2AC
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="niveau"
+                  value="3AC"
+                  className='mr-2'
+                  checked={niveau === '3AC'}
+                  onChange={() => setNiveau('3AC')}
+                />
+                3AC
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="niveau"
+                  value="TC"
+                  className='mr-2'
+                  checked={niveau === 'TC'}
+                  onChange={() => setNiveau('TC')}
+                />
+                TC
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="niveau"
+                  value="1ABAC"
+                  className='mr-2'
+                  checked={niveau === '1ABAC'}
+                  onChange={() => setNiveau('1ABAC')}
+                />
+                1ABAC
               </label>
             </div>
           </div>
@@ -170,7 +204,7 @@ const ExamCard = ({ exam, profId, onClose }) => {
           <div className="mb-4">
             <div className='flex gap-1 items-center mb-2'>
               <label className="block text-gray-700 font-medium">
-                {niveau === 'lycee' ? 'Module' : 'Unité'}
+                {niveau === '1ABAC' || 'TC' ? 'Module' : 'Unité'}
               </label>
               <p className='text-gray-400 text-xs'>(Commencer par {niveau === 'lycee' ? 'Module' : 'Unité'} n&#176; : )</p>
             </div>

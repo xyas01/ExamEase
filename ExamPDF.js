@@ -850,7 +850,7 @@ async function createPDF({ examName, module, note, school, className, year, last
     });
 
     // Save PDF to file
-    const dir = path.join(__dirname, 'files', school, className);
+    const dir = path.join(__dirname, 'files', examName, school, className);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
@@ -862,7 +862,7 @@ async function createPDF({ examName, module, note, school, className, year, last
     fs.writeFileSync(pdfFilePath, pdfBytes);
     console.log('PDF created successfully.');
 
-    return `http://localhost:5000/files/${school}/${className}/${pdfFileName}`;
+    return `https://examease-hzc8.onrender.com/files/${examName}/${school}/${className}/${pdfFileName}`;
 
   } catch (error) {
     console.error('Error creating PDF:', error);
