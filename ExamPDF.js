@@ -3,7 +3,7 @@ const fontkit = require('@pdf-lib/fontkit');
 const fs = require('fs');
 const path = require('path');
 
-async function createPDF({ examName, module, note, school, className, year, lastName, firstName, number, parties, studentQCM, studentCLD, studentCLT, studentRPF, studentRLV, studentRLE, studentOLE }) {
+async function createPDF({ examName, module,niveau, note, school, className, year, lastName, firstName, number, parties, studentQCM, studentCLD, studentCLT, studentRPF, studentRLV, studentRLE, studentOLE }) {
   try {
     const pdfDoc = await PDFDocument.create();
     const timesRomanBoldFont = await pdfDoc.embedFont(StandardFonts.TimesRomanBold);
@@ -862,7 +862,7 @@ async function createPDF({ examName, module, note, school, className, year, last
     fs.writeFileSync(pdfFilePath, pdfBytes);
     console.log('PDF created successfully.');
 
-    return `https://examease-hzc8.onrender.com/files/${examName}/${school}/${className}/${pdfFileName}`;
+    return `https://examease-hzc8.onrender.com/files/${niveau}/${examName}/${school}/${className}/${pdfFileName}`;
 
   } catch (error) {
     console.error('Error creating PDF:', error);
