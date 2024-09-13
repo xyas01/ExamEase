@@ -118,8 +118,14 @@ const NoteCard = ({ notes, niveau, examName, onClose }) => {
         </div>
       )}
 
-      <h2 className="text-xl font-bold mb-4">{selectedSchool ? selectedSchool : (selectedClass || 'Toutes les Classes')}</h2>
-
+      <h2 className="text-xl font-bold mb-4">
+        {selectedSchool
+          ? (selectedClass
+            ? selectedClass
+            : 'Toutes les Classes')
+          : 'Toutes les Ecoles'
+        }
+      </h2>
       <div className="grid grid-cols-4 font-semibold mb-2 gap-2 px-2 py-1 border border-gray-300 rounded-md" style={{ gridTemplateColumns: '20% 40% 20% 20%' }}>
         <div className="flex justify-between items-center">
           <span>Numero</span>
