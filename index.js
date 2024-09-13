@@ -36,7 +36,7 @@ mongoose.connect(process.env.MONGO_URL)
 // Route to handle image upload
 app.post('/api/upload-image', upload.single('image'), (req, res) => {
   if (req.file) {
-    res.json({ imageUrl: `http://localhost:5000/assets/${req.file.filename}` });
+    res.json({ imageUrl: `https://examease-hzc8.onrender.com/assets/${req.file.filename}` });
   } else {
     res.status(400).json({ error: 'Image upload failed' });
   }
