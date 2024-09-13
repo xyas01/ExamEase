@@ -44,13 +44,13 @@ app.post('/api/upload-image', upload.single('image'), (req, res) => {
 
 app.post('/api/create-document', async (req, res) => {
   try {
-    const { examName, module, note, school, className, year, lastName, firstName, number, parties, studentQCM, studentCLD, studentCLT, studentRPF, studentRLV, studentRLE, studentOLE } = req.body;
+    const { examName, module, niveau, note, school, className, year, lastName, firstName, number, parties, studentQCM, studentCLD, studentCLT, studentRPF, studentRLV, studentRLE, studentOLE } = req.body;
 
-    if (!examName || !module || !note || !school || !className || !year || !lastName || !firstName || !number || !parties) {
+    if (!examName || !module || !niveau || !note || !school || !className || !year || !lastName || !firstName || !number || !parties) {
       return res.status(400).send('Missing required fields');
     }
 
-    const fileUrl = await createPDF({ examName, module, note, school, className, year, lastName, firstName, number, parties, studentQCM, studentCLD, studentCLT, studentRPF, studentRLV, studentRLE, studentOLE });
+    const fileUrl = await createPDF({ examName, module, niveau, note, school, className, year, lastName, firstName, number, parties, studentQCM, studentCLD, studentCLT, studentRPF, studentRLV, studentRLE, studentOLE });
 
     res.json({ fileUrl });
   } catch (error) {
@@ -59,7 +59,7 @@ app.post('/api/create-document', async (req, res) => {
 });
 
 app.post('/api/download-zip', async (req, res) => {
-  const { school, class: selectedClass } = req.body;
+  const { niveau, school, class: selectedClass } = req.body;
 
   const directory = './files';
   const zip = new JSZip();
@@ -113,7 +113,7 @@ app.post('/api/download-zip', async (req, res) => {
     }
   } else {
     // If neither is selected
-    zipFilename = 'leTout.zip';
+    zipFilename = `${niveau}.zip`;
 
     const allSchools = fs.readdirSync(directory);
 
@@ -167,7 +167,7 @@ app.use('/api/teacher', teacherRoutes);
 
 // Use the client app
 app.use(express.static(path.join(__dirname, '/client/build')));
-app.get('*', (req,res)=> res.sendFile(path.join(__dirname, '/client/build/index.html')));
+app.get('*', (req, res) => res.sendFile(path.join(__dirname, '/client/build/index.html')));
 
 
 
