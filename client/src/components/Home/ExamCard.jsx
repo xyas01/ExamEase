@@ -204,9 +204,9 @@ const ExamCard = ({ exam, profId, onClose }) => {
           <div className="mb-4">
             <div className='flex gap-1 items-center mb-2'>
               <label className="block text-gray-700 font-medium">
-                {(niveau === '1ABAC' || 'TC') ? 'Module' : 'Unité'}
+                {(niveau === '1ABAC' || niveau === 'TC') ? 'Module' : 'Unité'}
               </label>
-              <p className='text-gray-400 text-xs'>(Commencer par {(niveau === '1ABAC' || 'TC') ? 'Module' : 'Unité'} n&#176; : )</p>
+              <p className='text-gray-400 text-xs'>(Commencer par {(niveau === '1ABAC' || niveau === 'TC') ? 'Module' : 'Unité'} n&#176; : )</p>
             </div>
             <input
               type="text"
