@@ -152,7 +152,7 @@ const Main = ({ userRole }) => {
                     </button>
                   </div>
                   {visibleNoteCardExamId === exam._id && (
-                    <NoteCard notes={exam.answers} onClose={handleCloseNoteCard} />
+                    <NoteCard niveau={exam.niveau} examName={exam.name} notes={exam.answers} onClose={handleCloseNoteCard} />
                   )}
                 </div>
               );

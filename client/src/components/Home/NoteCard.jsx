@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import Swap from '../../assets/Swap.svg';
 
-const NoteCard = ({ notes, onClose }) => {
+const NoteCard = ({ notes, niveau, examName, onClose }) => {
   const [selectedSchool, setSelectedSchool] = useState(null);
   const [selectedClass, setSelectedClass] = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: 'number', direction: 'asc' });
@@ -58,16 +58,18 @@ const NoteCard = ({ notes, onClose }) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          niveau,
+          examName,
           school: selectedSchool,
           class: selectedClass,
         }),
       });
-  
+
       if (response.ok) {
         // Get the filename from the Content-Disposition header
         const disposition = response.headers.get('Content-Disposition');
         const filename = disposition?.match(/filename="([^"]*)"/)?.[1] || 'files.zip';
-  
+
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -83,7 +85,7 @@ const NoteCard = ({ notes, onClose }) => {
       console.error('An error occurred:', error);
     }
   };
-  
+
 
   return (
     <div className="relative flex flex-col border border-sky-500 mt-4 bg-white px-6 py-3 rounded-lg shadow-lg">

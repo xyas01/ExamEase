@@ -59,7 +59,7 @@ app.post('/api/create-document', async (req, res) => {
 });
 
 app.post('/api/download-zip', async (req, res) => {
-  const { niveau, school, class: selectedClass } = req.body;
+  const { niveau, examName, school, class: selectedClass } = req.body;
 
   const directory = './files';
   const zip = new JSZip();
@@ -70,7 +70,7 @@ app.post('/api/download-zip', async (req, res) => {
       // If both a school and a class are selected
       zipFilename = `${selectedClass}.zip`;
 
-      const schoolPath = path.join(directory, school);
+      const schoolPath = path.join(directory, niveau, examName, school);
       if (fs.statSync(schoolPath).isDirectory()) {
         const classPath = path.join(schoolPath, selectedClass);
         if (fs.statSync(classPath).isDirectory()) {
@@ -89,7 +89,7 @@ app.post('/api/download-zip', async (req, res) => {
       // If only a school is selected
       zipFilename = `${school}.zip`;
 
-      const schoolPath = path.join(directory, school);
+      const schoolPath = path.join(directory, niveau, examName, school);
       if (fs.statSync(schoolPath).isDirectory()) {
         const schoolZipFolder = zip.folder(school);
 
