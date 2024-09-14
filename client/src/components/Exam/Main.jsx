@@ -103,10 +103,15 @@ const Main = ({ userRole }) => {
     useEffect(() => {
         // Check if the exam is completed and redirect on reload
         const handleBeforeUnload = (e) => {
+            const currentPath = window.location.pathname;
             if (isCompleted) {
                 e.preventDefault();
                 localStorage.clear();
-                navigate('/'); // React router navigation
+                window.location.href = '/'; // React router navigation
+                console.log(currentPath);
+                if (currentPath !== '/') {
+                    navigate('/'); // React router navigation
+                }
                 e.returnValue = ''; // Required for some browsers
             }
         };
