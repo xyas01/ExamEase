@@ -101,27 +101,32 @@ const Main = ({ userRole }) => {
     }, [isCompleted, exam, totalScore, school, className, lastname, firstname, number]);
 
     useEffect(() => {
-        // Check if the exam is completed and redirect on reload
         const handleBeforeUnload = (e) => {
-            const currentPath = window.location.pathname;
             if (isCompleted) {
+                localStorage.setItem('examCompleted', 'true'); // Set flag in localStorage
                 e.preventDefault();
-                localStorage.clear();
-                window.location.href = '/'; // React router navigation
-                console.log(currentPath);
-                if (currentPath !== '/') {
-                    navigate('/'); // React router navigation
-                }
-                e.returnValue = ''; // Required for some browsers
+                e.returnValue = ''; // Required to trigger confirmation on some browsers
             }
         };
-    
+
         window.addEventListener('beforeunload', handleBeforeUnload);
-    
+
         return () => {
             window.removeEventListener('beforeunload', handleBeforeUnload);
         };
-    }, [isCompleted, navigate]);
+    }, [isCompleted]);
+
+    // Handle redirection after the page reloads
+    useEffect(() => {
+        const examCompleted = localStorage.getItem('examCompleted');
+        const currentPath = window.location.pathname;
+
+        // If the exam is completed and the user is still on the exam page, redirect them
+        if (examCompleted === 'true' && currentPath !== '/') {
+            localStorage.clear(); // Clear the localStorage flag
+            navigate('/'); // Redirect to home page
+        }
+    }, [navigate]);
     
     useEffect(() => {
         const updateExamAnswer = async () => {
