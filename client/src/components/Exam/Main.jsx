@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { v4 } from 'uuid';
 import axios from 'axios';
 import Grade from './Grade';
@@ -12,6 +12,7 @@ import ExamRLE from './ExamRLE';
 import ExamOLE from './ExamOLE';
 
 const Main = ({ userRole }) => {
+    const navigate = useNavigate();
     const [exam, setExam] = useState(null);
     const [isCompleted, setIsCompleted] = useState(false);
     const [details, setDetails] = useState({});
@@ -105,18 +106,18 @@ const Main = ({ userRole }) => {
             if (isCompleted) {
                 e.preventDefault();
                 localStorage.clear();
-                window.location.href = '/';
-                return ''; // Required for some browsers
+                navigate('/'); // React router navigation
+                e.returnValue = ''; // Required for some browsers
             }
         };
-
+    
         window.addEventListener('beforeunload', handleBeforeUnload);
-
+    
         return () => {
             window.removeEventListener('beforeunload', handleBeforeUnload);
         };
-    }, [isCompleted]);
-
+    }, [isCompleted, navigate]);
+    
     useEffect(() => {
         const updateExamAnswer = async () => {
 
