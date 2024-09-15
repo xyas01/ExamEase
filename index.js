@@ -72,6 +72,13 @@ async function listFilesInGCSFolder(prefix) {
   return files; // Array of file objects
 }
 
+// Function to recursively list all files in a GCS folder (prefix)
+async function listFilesInGCSFolder(prefix) {
+  const bucket = storage.bucket(bucketName);
+  const [files] = await bucket.getFiles({ prefix });
+  return files; // Array of file objects
+}
+
 // Function to download file data from GCS
 async function downloadFileFromGCS(file) {
   const [fileData] = await file.download();
@@ -79,12 +86,12 @@ async function downloadFileFromGCS(file) {
 }
 
 // Function to recursively add files to ZIP while preserving folder structure
-async function addFilesToZip(zip, folderPrefix, gcsFiles, basePrefix) {
+async function addFilesToZip(zip, folderPrefix, gcsFiles, basePrefix, zipFolderName) {
   for (const file of gcsFiles) {
     if (file.name.endsWith('.pdf')) {
       const fileData = await downloadFileFromGCS(file);
-      const relativePath = file.name.replace(basePrefix, ''); // Remove basePrefix for correct structure
-      zip.file(relativePath, fileData); // Add file to ZIP
+      const relativePath = file.name.replace(folderPrefix, ''); // Remove folder prefix to get only filename
+      zip.file(path.join(zipFolderName, relativePath), fileData); // Add file to ZIP under desired folder
     }
   }
 }
@@ -107,14 +114,16 @@ app.post('/api/download-zip', async (req, res) => {
         const classFolderPrefix = `${basePrefix}${school}/${selectedClass}/`; // GCS prefix for class folder
         const classFiles = await listFilesInGCSFolder(classFolderPrefix);
 
-        await addFilesToZip(zip, classFolderPrefix, classFiles, basePrefix);
+        // Add files directly under the class folder in ZIP
+        await addFilesToZip(zip, classFolderPrefix, classFiles, basePrefix, selectedClass);
       } else {
         // If only school is selected
         zipFilename = `${school}.zip`;
         const schoolFolderPrefix = `${basePrefix}${school}/`; // GCS prefix for school folder
         const schoolFiles = await listFilesInGCSFolder(schoolFolderPrefix);
 
-        await addFilesToZip(zip, schoolFolderPrefix, schoolFiles, basePrefix);
+        // Add all class files under the school folder in ZIP
+        await addFilesToZip(zip, schoolFolderPrefix, schoolFiles, basePrefix, school);
       }
     } else {
       // If neither school nor class is selected, zip everything under examName and niveau
@@ -122,8 +131,8 @@ app.post('/api/download-zip', async (req, res) => {
 
       const allFiles = await listFilesInGCSFolder(basePrefix); // Get all files under examName/niveau
 
-      // Add all files recursively to the ZIP, preserving GCS folder structure
-      await addFilesToZip(zip, basePrefix, allFiles, basePrefix);
+      // Add all files to ZIP, preserving GCS folder structure
+      await addFilesToZip(zip, basePrefix, allFiles, basePrefix, examName);
     }
 
     // Generate the ZIP file
