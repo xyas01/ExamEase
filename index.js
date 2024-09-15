@@ -68,8 +68,7 @@ app.post('/api/create-document', async (req, res) => {
 // Function to list files from GCS folder (prefix)
 async function listFilesInGCSFolder(prefix) {
   const bucket = storage.bucket(bucketName);
-  const [files] = await bucket.getFiles({ prefix });
-  console.log(prefix);
+  const [files] = await bucket.getFiles({ prefix, delimiter: '/' }); // Use delimiter to handle directories
   console.log(files);
   return files; // Array of file objects
 }
@@ -80,6 +79,11 @@ async function downloadFileFromGCS(file) {
   return fileData;
 }
 
+// Function to normalize paths to use backslashes
+function normalizePath(filePath) {
+  return filePath.replace(/\//g, '\\'); // Normalize path for ZIP
+}
+
 // POST endpoint to download the ZIP with GCS files
 app.post('/api/download-zip', async (req, res) => {
   const { niveau, examName, school, class: selectedClass } = req.body;
@@ -88,28 +92,28 @@ app.post('/api/download-zip', async (req, res) => {
   let zipFilename = 'files.zip'; // Default filename
 
   try {
-    // Normalize the base directory to use forward slashes
-    const baseDirectory = path.join(niveau, examName).replace(/\//g, '\\');; // Base GCS prefix
+    // Normalize the base directory to use forward slashes for GCS
+    const baseDirectory = path.join(niveau, examName) + '/'; // Base GCS prefix
 
     if (school) {
       if (selectedClass) {
         // If both a school and a class are selected
         zipFilename = `${selectedClass}.zip`;
-        const classFolderPath = path.join(baseDirectory, school, selectedClass).replace(/\//g, '\\'); + '\\'; // GCS prefix for class
+        const classFolderPath = path.join(baseDirectory, school, selectedClass) + '/'; // GCS prefix for class
         const files = await listFilesInGCSFolder(classFolderPath);
 
         // Add each PDF file to the ZIP
         for (const file of files) {
           if (file.name.endsWith('.pdf')) {
             const fileData = await downloadFileFromGCS(file);
-            const relativePath = file.name.replace(classFolderPath, ''); // Normalize path for ZIP
+            const relativePath = normalizePath(file.name.replace(classFolderPath, '')); // Normalize path for ZIP
             zip.file(relativePath, fileData);
           }
         }
       } else {
         // If only a school is selected
         zipFilename = `${school}.zip`;
-        const schoolFolderPath = path.join(baseDirectory, school).replace(/\//g, '\\'); + '\\'; // GCS prefix for school
+        const schoolFolderPath = path.join(baseDirectory, school) + '/'; // GCS prefix for school
 
         const files = await listFilesInGCSFolder(schoolFolderPath);
 
@@ -117,8 +121,7 @@ app.post('/api/download-zip', async (req, res) => {
         for (const file of files) {
           if (file.name.endsWith('.pdf')) {
             const fileData = await downloadFileFromGCS(file);
-            console.log(fileData)
-            const relativePath = file.name.replace(schoolFolderPath, ''); // Normalize path for ZIP
+            const relativePath = normalizePath(file.name.replace(schoolFolderPath, '')); // Normalize path for ZIP
             zip.file(relativePath, fileData);
           }
         }
@@ -127,13 +130,13 @@ app.post('/api/download-zip', async (req, res) => {
       // If neither school nor class is selected, zip everything under examName and niveau
       zipFilename = `${examName}.zip`;
 
-      const allFiles = await listFilesInGCSFolder(baseDirectory + '\\'); // Get all files in the base directory (niveau/examName)
+      const allFiles = await listFilesInGCSFolder(baseDirectory); // Get all files in the base directory (niveau/examName)
 
       // Add each file to the ZIP, maintaining the GCS folder structure
       for (const file of allFiles) {
         if (file.name.endsWith('.pdf')) {
           const fileData = await downloadFileFromGCS(file);
-          const relativePath = file.name.replace(baseDirectory + '\\', ''); // Normalize path for ZIP
+          const relativePath = normalizePath(file.name.replace(baseDirectory, '')); // Normalize path for ZIP
           zip.file(relativePath, fileData);
         }
       }
