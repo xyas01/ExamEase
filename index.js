@@ -69,7 +69,6 @@ app.post('/api/create-document', async (req, res) => {
 async function listFilesInGCSFolder(prefix) {
   const bucket = storage.bucket(bucketName);
   const [files] = await bucket.getFiles({ prefix, delimiter: '/' }); // Use delimiter to handle directories
-  console.log(files);
   return files; // Array of file objects
 }
 
@@ -136,8 +135,16 @@ app.post('/api/download-zip', async (req, res) => {
       for (const file of allFiles) {
         if (file.name.endsWith('.pdf')) {
           const fileData = await downloadFileFromGCS(file);
-          const relativePath = normalizePath(file.name.replace(baseDirectory, '')); // Normalize path for ZIP
-          zip.file(relativePath, fileData);
+          const fullPathInGCS = file.name.replace(baseDirectory, ''); // Remove baseDirectory from file path
+          const relativePath = normalizePath(fullPathInGCS); // Normalize path for ZIP
+
+          // Extract the directory from the GCS path to create nested folders in the ZIP
+          const folderPath = path.dirname(relativePath); // Get folder path from file name
+          if (folderPath !== '.') {
+            zip.folder(folderPath); // Create the folder in the ZIP if it doesn't exist
+          }
+
+          zip.file(relativePath, fileData); // Add the file to the correct folder in the ZIP
         }
       }
     }
