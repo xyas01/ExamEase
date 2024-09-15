@@ -65,10 +65,10 @@ app.post('/api/create-document', async (req, res) => {
   }
 });
 
-// Function to list files from GCS folder (prefix)
+// Function to recursively list all files in a GCS folder (prefix)
 async function listFilesInGCSFolder(prefix) {
   const bucket = storage.bucket(bucketName);
-  const [files] = await bucket.getFiles({ prefix, delimiter: '/' }); // Use delimiter to handle directories
+  const [files] = await bucket.getFiles({ prefix });
   return files; // Array of file objects
 }
 
@@ -78,9 +78,15 @@ async function downloadFileFromGCS(file) {
   return fileData;
 }
 
-// Function to normalize paths to use backslashes
-function normalizePath(filePath) {
-  return filePath.replace(/\//g, '\\'); // Normalize path for ZIP
+// Function to recursively add files to ZIP while preserving folder structure
+async function addFilesToZip(zip, folderPrefix, gcsFiles, basePrefix) {
+  for (const file of gcsFiles) {
+    if (file.name.endsWith('.pdf')) {
+      const fileData = await downloadFileFromGCS(file);
+      const relativePath = file.name.replace(basePrefix, ''); // Remove basePrefix for correct structure
+      zip.file(relativePath, fileData); // Add file to ZIP
+    }
+  }
 }
 
 // POST endpoint to download the ZIP with GCS files
@@ -91,62 +97,33 @@ app.post('/api/download-zip', async (req, res) => {
   let zipFilename = 'files.zip'; // Default filename
 
   try {
-    // Normalize the base directory to use forward slashes for GCS
-    const baseDirectory = path.join(niveau, examName) + '/'; // Base GCS prefix
+    // Normalize the base directory (GCS prefix)
+    const basePrefix = `${niveau}/${examName}/`;
 
     if (school) {
       if (selectedClass) {
-        // If both a school and a class are selected
+        // If both school and class are selected
         zipFilename = `${selectedClass}.zip`;
-        const classFolderPath = path.join(baseDirectory, school, selectedClass) + '/'; // GCS prefix for class
-        const files = await listFilesInGCSFolder(classFolderPath);
+        const classFolderPrefix = `${basePrefix}${school}/${selectedClass}/`; // GCS prefix for class folder
+        const classFiles = await listFilesInGCSFolder(classFolderPrefix);
 
-        // Add each PDF file to the ZIP
-        for (const file of files) {
-          if (file.name.endsWith('.pdf')) {
-            const fileData = await downloadFileFromGCS(file);
-            const relativePath = normalizePath(file.name.replace(classFolderPath, '')); // Normalize path for ZIP
-            zip.file(relativePath, fileData);
-          }
-        }
+        await addFilesToZip(zip, classFolderPrefix, classFiles, basePrefix);
       } else {
-        // If only a school is selected
+        // If only school is selected
         zipFilename = `${school}.zip`;
-        const schoolFolderPath = path.join(baseDirectory, school) + '/'; // GCS prefix for school
+        const schoolFolderPrefix = `${basePrefix}${school}/`; // GCS prefix for school folder
+        const schoolFiles = await listFilesInGCSFolder(schoolFolderPrefix);
 
-        const files = await listFilesInGCSFolder(schoolFolderPath);
-
-        // Add each file to the ZIP, maintaining folder structure
-        for (const file of files) {
-          if (file.name.endsWith('.pdf')) {
-            const fileData = await downloadFileFromGCS(file);
-            const relativePath = normalizePath(file.name.replace(schoolFolderPath, '')); // Normalize path for ZIP
-            zip.file(relativePath, fileData);
-          }
-        }
+        await addFilesToZip(zip, schoolFolderPrefix, schoolFiles, basePrefix);
       }
     } else {
       // If neither school nor class is selected, zip everything under examName and niveau
       zipFilename = `${examName}.zip`;
 
-      const allFiles = await listFilesInGCSFolder(baseDirectory); // Get all files in the base directory (niveau/examName)
+      const allFiles = await listFilesInGCSFolder(basePrefix); // Get all files under examName/niveau
 
-      // Add each file to the ZIP, maintaining the GCS folder structure
-      for (const file of allFiles) {
-        if (file.name.endsWith('.pdf')) {
-          const fileData = await downloadFileFromGCS(file);
-          const fullPathInGCS = file.name.replace(baseDirectory, ''); // Remove baseDirectory from file path
-          const relativePath = normalizePath(fullPathInGCS); // Normalize path for ZIP
-
-          // Extract the directory from the GCS path to create nested folders in the ZIP
-          const folderPath = path.dirname(relativePath); // Get folder path from file name
-          if (folderPath !== '.') {
-            zip.folder(folderPath); // Create the folder in the ZIP if it doesn't exist
-          }
-
-          zip.file(relativePath, fileData); // Add the file to the correct folder in the ZIP
-        }
-      }
+      // Add all files recursively to the ZIP, preserving GCS folder structure
+      await addFilesToZip(zip, basePrefix, allFiles, basePrefix);
     }
 
     // Generate the ZIP file
