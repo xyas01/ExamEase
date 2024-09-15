@@ -3,6 +3,9 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const multer = require('multer');
 const fs = require('fs');
+const { Storage } = require('@google-cloud/storage');
+const JSZip = require('jszip');
+const path = require('path');
 const JSZip = require('jszip');
 const path = require('path');
 const { createPDF } = require('./ExamPDF');
@@ -12,12 +15,18 @@ require('dotenv').config();
 const app = express();
 app.use(cors());
 app.use(express.json());
+// Initialize the GCS client
+const storage = new Storage({
+  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  keyFilename: "examease-435712-56128730b299.json", // Path to your GCS service account key file
+});
+const bucketName = 'examease_bucket'; // Your Google Cloud bucket name
 
 // Set up static file serving for the assets folder
 app.use('/assets', express.static('assets'));
 
 // Set up multer for file uploads
-const storage = multer.diskStorage({
+const multerStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, 'assets'); // Save files to the assets folder
   },
@@ -26,7 +35,7 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ storage });
+const upload = multer({ multerStorage });
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGO_URL)
@@ -58,96 +67,89 @@ app.post('/api/create-document', async (req, res) => {
   }
 });
 
+// Function to list files from GCS folder (prefix)
+async function listFilesInGCSFolder(prefix) {
+  const bucket = storage.bucket(bucketName);
+  const [files] = await bucket.getFiles({ prefix });
+  return files; // Array of file objects
+}
+
+// Function to download file data from GCS
+async function downloadFileFromGCS(file) {
+  const [fileData] = await file.download();
+  return fileData;
+}
+
+// POST endpoint to download the ZIP with GCS files
 app.post('/api/download-zip', async (req, res) => {
   const { niveau, examName, school, class: selectedClass } = req.body;
 
-  const directory = `./files/${niveau}/${examName}`;
   const zip = new JSZip();
   let zipFilename = 'files.zip'; // Default filename
 
-  if (school) {
-    if (selectedClass) {
-      // If both a school and a class are selected
-      zipFilename = `${selectedClass}.zip`;
+  try {
+    // Normalize the base directory to use forward slashes
+    const baseDirectory = path.join(niveau, examName); // Base GCS prefix
 
-      const schoolPath = path.join(directory, school);
-      if (fs.statSync(schoolPath).isDirectory()) {
-        const classPath = path.join(schoolPath, selectedClass);
-        if (fs.statSync(classPath).isDirectory()) {
-          const classZipFolder = zip.folder(selectedClass);
+    if (school) {
+      if (selectedClass) {
+        // If both a school and a class are selected
+        zipFilename = `${selectedClass}.zip`;
+        const classFolderPath = path.join(baseDirectory, school, selectedClass) + '\\'; // GCS prefix for class
+        const files = await listFilesInGCSFolder(classFolderPath);
 
-          const pdfFiles = fs.readdirSync(classPath).filter(file => path.extname(file) === '.pdf');
+        // Add each PDF file to the ZIP
+        for (const file of files) {
+          if (file.name.endsWith('.pdf')) {
+            const fileData = await downloadFileFromGCS(file);
+            const relativePath = file.name.replace(classFolderPath, ''); // Normalize path for ZIP
+            zip.file(relativePath, fileData);
+          }
+        }
+      } else {
+        // If only a school is selected
+        zipFilename = `${school}.zip`;
+        const schoolFolderPath = path.join(baseDirectory, school) + '\\'; // GCS prefix for school
 
-          pdfFiles.forEach(pdf => {
-            const filePath = path.join(classPath, pdf);
-            const fileData = fs.readFileSync(filePath);
-            classZipFolder.file(pdf, fileData);
-          });
+        const files = await listFilesInGCSFolder(schoolFolderPath);
+
+        // Add each file to the ZIP, maintaining folder structure
+        for (const file of files) {
+          if (file.name.endsWith('.pdf')) {
+            const fileData = await downloadFileFromGCS(file);
+            const relativePath = file.name.replace(schoolFolderPath, ''); // Normalize path for ZIP
+            zip.file(relativePath, fileData);
+          }
         }
       }
     } else {
-      // If only a school is selected
-      zipFilename = `${school}.zip`;
+      // If neither school nor class is selected, zip everything under examName and niveau
+      zipFilename = `${examName}.zip`;
 
-      const schoolPath = path.join(directory, school);
-      if (fs.statSync(schoolPath).isDirectory()) {
-        const schoolZipFolder = zip.folder(school);
+      const allFiles = await listFilesInGCSFolder(baseDirectory + '\\'); // Get all files in the base directory (niveau/examName)
 
-        const classDirectories = fs.readdirSync(schoolPath);
-
-        classDirectories.forEach(classDirectory => {
-          const classPath = path.join(schoolPath, classDirectory);
-          if (fs.statSync(classPath).isDirectory()) {
-            const classZipFolder = schoolZipFolder.folder(classDirectory);
-
-            const pdfFiles = fs.readdirSync(classPath).filter(file => path.extname(file) === '.pdf');
-
-            pdfFiles.forEach(pdf => {
-              const filePath = path.join(classPath, pdf);
-              const fileData = fs.readFileSync(filePath);
-              classZipFolder.file(pdf, fileData);
-            });
-          }
-        });
+      // Add each file to the ZIP, maintaining the GCS folder structure
+      for (const file of allFiles) {
+        if (file.name.endsWith('.pdf')) {
+          const fileData = await downloadFileFromGCS(file);
+          const relativePath = file.name.replace(baseDirectory + '\\', ''); // Normalize path for ZIP
+          zip.file(relativePath, fileData);
+        }
       }
     }
-  } else {
-    // If neither is selected
-    zipFilename = `${examName}.zip`;
 
-    const allSchools = fs.readdirSync(directory);
-
-    allSchools.forEach(schoolDirectory => {
-      const schoolPath = path.join(directory, schoolDirectory);
-      if (fs.statSync(schoolPath).isDirectory()) {
-        const schoolZipFolder = zip.folder(schoolDirectory);
-
-        const classDirectories = fs.readdirSync(schoolPath);
-
-        classDirectories.forEach(classDirectory => {
-          const classPath = path.join(schoolPath, classDirectory);
-          if (fs.statSync(classPath).isDirectory()) {
-            const classZipFolder = schoolZipFolder.folder(classDirectory);
-
-            const pdfFiles = fs.readdirSync(classPath).filter(file => path.extname(file) === '.pdf');
-
-            pdfFiles.forEach(pdf => {
-              const filePath = path.join(classPath, pdf);
-              const fileData = fs.readFileSync(filePath);
-              classZipFolder.file(pdf, fileData);
-            });
-          }
-        });
-      }
-    });
+    // Generate the ZIP file
+    const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+    res.set('Content-Type', 'application/zip');
+    res.set('Content-Disposition', `attachment; filename="${zipFilename}"`);
+    res.set('Access-Control-Expose-Headers', 'Content-Disposition'); // Expose the Content-Disposition header
+    res.send(zipBuffer);
+  } catch (error) {
+    console.error('Error creating ZIP:', error);
+    res.status(500).send('Failed to create ZIP file.');
   }
-
-  const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
-  res.set('Content-Type', 'application/zip');
-  res.set('Content-Disposition', `attachment; filename="${zipFilename}"`);
-  res.set('Access-Control-Expose-Headers', 'Content-Disposition'); // Expose the Content-Disposition header
-  res.send(zipBuffer);
 });
+
 
 
 

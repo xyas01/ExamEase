@@ -1,7 +1,29 @@
 const { PDFDocument, rgb, StandardFonts } = require('pdf-lib');
 const fontkit = require('@pdf-lib/fontkit');
 const fs = require('fs');
+const { Storage } = require('@google-cloud/storage');
 const path = require('path');
+
+// Initialize the GCS client
+const storage = new Storage({
+  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  keyFilename: "examease-435712-56128730b299.json", // Path to your GCS service account key file
+});
+
+const bucketName = 'examease_bucket'; // Your Google Cloud bucket name
+
+// Function to upload the PDF to Google Cloud Storage
+async function uploadPDFToGCS(pdfBytes, filePath) {
+  const bucket = storage.bucket(bucketName);
+  const file = bucket.file(filePath);
+
+  // Upload the file to GCS
+  await file.save(pdfBytes);
+  console.log(`File uploaded to GCS at: ${filePath}`);
+
+  // Return the public URL of the uploaded file
+  return `https://storage.googleapis.com/${bucketName}/${filePath}`;
+}
 
 async function createPDF({ examName, module, niveau, note, school, className, year, lastName, firstName, number, parties, studentQCM, studentCLD, studentCLT, studentRPF, studentRLV, studentRLE, studentOLE }) {
   try {
@@ -849,20 +871,18 @@ async function createPDF({ examName, module, niveau, note, school, className, ye
       }
     });
 
-    // Save PDF to file
-    const dir = path.join(__dirname, 'files', niveau, examName, school, className);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-
+    // Save PDF to Google Cloud Storage
+    const dir = path.join(niveau, examName, school, className); // Folder structure in GCS
     const pdfFileName = `${number}- ${lastName} ${firstName}.pdf`;
     const pdfFilePath = path.join(dir, pdfFileName);
     const pdfBytes = await pdfDoc.save();
 
-    fs.writeFileSync(pdfFilePath, pdfBytes);
-    console.log('PDF created successfully.');
+    // Upload the PDF to GCS
+    const publicUrl = await uploadPDFToGCS(pdfBytes, pdfFilePath);
 
-    return `https://examease-hzc8.onrender.com/files/${niveau}/${examName}/${school}/${className}/${pdfFileName}`;
+    console.log('PDF created and uploaded successfully.');
+
+    return publicUrl;
 
   } catch (error) {
     console.error('Error creating PDF:', error);
