@@ -89,13 +89,13 @@ app.post('/api/download-zip', async (req, res) => {
 
   try {
     // Normalize the base directory to use forward slashes
-    const baseDirectory = path.join(niveau, examName); // Base GCS prefix
+    const baseDirectory = path.join(niveau, examName).replace(/\//g, '\\');; // Base GCS prefix
 
     if (school) {
       if (selectedClass) {
         // If both a school and a class are selected
         zipFilename = `${selectedClass}.zip`;
-        const classFolderPath = path.join(baseDirectory, school, selectedClass) + '\\'; // GCS prefix for class
+        const classFolderPath = path.join(baseDirectory, school, selectedClass).replace(/\//g, '\\'); + '\\'; // GCS prefix for class
         const files = await listFilesInGCSFolder(classFolderPath);
 
         // Add each PDF file to the ZIP
@@ -109,7 +109,7 @@ app.post('/api/download-zip', async (req, res) => {
       } else {
         // If only a school is selected
         zipFilename = `${school}.zip`;
-        const schoolFolderPath = path.join(baseDirectory, school) + '\\'; // GCS prefix for school
+        const schoolFolderPath = path.join(baseDirectory, school).replace(/\//g, '\\'); + '\\'; // GCS prefix for school
 
         const files = await listFilesInGCSFolder(schoolFolderPath);
 
