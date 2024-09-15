@@ -16,7 +16,7 @@ app.use(express.json());
 // Initialize the GCS client
 const storage = new Storage({
   projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
-  keyFilename: "examease-435712-56128730b299.json", // Path to your GCS service account key file
+  keyFilename: "/etc/secrets/examease-435712-56128730b299.json", // Path to your GCS service account key file
 });
 const bucketName = 'examease_bucket'; // Your Google Cloud bucket name
 
