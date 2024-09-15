@@ -69,6 +69,8 @@ app.post('/api/create-document', async (req, res) => {
 async function listFilesInGCSFolder(prefix) {
   const bucket = storage.bucket(bucketName);
   const [files] = await bucket.getFiles({ prefix });
+  console.log(prefix);
+  console.log(files);
   return files; // Array of file objects
 }
 
@@ -115,6 +117,7 @@ app.post('/api/download-zip', async (req, res) => {
         for (const file of files) {
           if (file.name.endsWith('.pdf')) {
             const fileData = await downloadFileFromGCS(file);
+            console.log(fileData)
             const relativePath = file.name.replace(schoolFolderPath, ''); // Normalize path for ZIP
             zip.file(relativePath, fileData);
           }
