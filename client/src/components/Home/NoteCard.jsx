@@ -119,9 +119,9 @@ const NoteCard = ({ exam, notes, niveau, examName, onClose }) => {
   
         // If response is a file URL (likely for individual Excel file)
         if (selectedSchool && selectedClass) {
-          const fileUrl = await response.text(); // The backend might return the file URL
-          // This ensures that the file is downloaded directly, avoiding CORS issues
-          window.location.href = fileUrl;
+           // Handle single file download
+        const { fileUrl } = await response.json(); // Expecting JSON response with file URL
+        window.location.href = fileUrl;
         } else {
           // For ZIP or blob response (like when downloading multiple files)
           const blob = await response.blob();

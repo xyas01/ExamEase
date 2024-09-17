@@ -116,14 +116,16 @@ app.post('/api/create-and-download', async (req, res) => {
       const matchingFile = existingFiles.find(file => file.name.includes(selectedClass));
 
       if (matchingFile) {
+        console.log(matchingFile.name, 'matched')
         const bucket = storage.bucket(bucketName);
         const file = bucket.file(matchingFile.name);
         res.set('Content-Disposition', `attachment; filename="${selectedClass}.xlsx"`);
         res.set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         file.createReadStream().pipe(res);
       } else {
+        console.log(matchingFile.name, 'unmatched')
         const fileUrl = await generateExamExcel(exam, year);
-        res.redirect(fileUrl);
+        res.json({ fileUrl });
       }
     } else {
       // Handle ZIP creation if needed
