@@ -109,29 +109,21 @@ app.post('/api/create-and-download', async (req, res) => {
     const basePrefix = `Excel/${niveau}/${examName}/`;
 
     if (selectedSchool && selectedClass) {
-      // If both school and class are selected, check if the Excel file already exists in GCS
       const exam = { name: examName, notes, module, niveau, school: selectedSchool, className: selectedClass };
       const classFilePrefix = `${basePrefix}${selectedSchool}/${selectedClass}/`;
       const existingFiles = await listFilesInGCSFolder(classFilePrefix);
 
-      // Look for the file matching the selected class
-      const matchingFile = existingFiles.find(file => file.includes(selectedClass));
+      const matchingFile = existingFiles.find(file => file.name.includes(selectedClass));
 
       if (matchingFile) {
-        // If the Excel file exists, stream it to the client instead of redirecting
-        const bucket = storage.bucket('examease_bucket');
-        const file = bucket.file(matchingFile);
+        const bucket = storage.bucket(bucketName);
+        const file = bucket.file(matchingFile.name);
         res.set('Content-Disposition', `attachment; filename="${selectedClass}.xlsx"`);
         res.set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         file.createReadStream().pipe(res);
       } else {
-        // If the Excel file doesn't exist, generate it and stream it to the client
         const fileUrl = await generateExamExcel(exam, year);
-        const bucket = storage.bucket('examease_bucket');
-        const file = bucket.file(fileUrl);
-        res.set('Content-Disposition', `attachment; filename="${selectedClass}.xlsx"`);
-        res.set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        file.createReadStream().pipe(res);
+        res.redirect(fileUrl);
       }
     } else {
       // Handle ZIP creation if needed
@@ -139,63 +131,49 @@ app.post('/api/create-and-download', async (req, res) => {
       let zipFilename = 'files.zip';
 
       if (selectedSchool) {
-        // If only school is selected, generate or fetch Excel files for all classes in the school
         zipFilename = `${selectedSchool}.zip`;
         const schoolFolderPrefix = `${basePrefix}${selectedSchool}/`;
 
-        // Extract the classes for the selected school from the access field
         const classes = access
           .filter(entry => Object.keys(entry)[0] === selectedSchool)
           .map(entry => entry[selectedSchool]);
 
-        // Ensure classes is always an array
-        classes = Array.isArray(classes) ? classes : [classes];
-
+        const classesArray = Array.isArray(classes) ? classes : [classes];
         let schoolFiles = await listFilesInGCSFolder(schoolFolderPrefix);
 
         if (schoolFiles.length === 0) {
-          // If no files exist, generate Excel files for all classes
-          for (const className of classes) {
+          for (const className of classesArray) {
             const exam = { name: examName, notes, module, niveau, school: selectedSchool, className };
             await generateExamExcel(exam, year);
           }
-          // Re-fetch files after generating them
           schoolFiles = await listFilesInGCSFolder(schoolFolderPrefix);
         }
 
-        await addExcelFilesToZip(zip, schoolFolderPrefix, schoolFiles, basePrefix);
-
+        await addExcelFilesToZip(zip, schoolFolderPrefix, schoolFiles, basePrefix, selectedSchool);
       } else {
-        // If no school is selected, generate or fetch Excel files for all schools and their classes
         zipFilename = `${examName}.zip`;
 
         for (const entry of access) {
           const school = Object.keys(entry)[0];
           let classes = entry[school];
 
-          // Ensure classes is always an array
           classes = Array.isArray(classes) ? classes : [classes];
 
           const schoolFolderPrefix = `${basePrefix}${school}/`;
-
           let schoolFiles = await listFilesInGCSFolder(schoolFolderPrefix);
 
           if (schoolFiles.length === 0) {
-            // If no files exist, generate Excel files for all classes
             for (const className of classes) {
               const exam = { name: examName, notes, module, niveau, school, className };
               await generateExamExcel(exam, year);
             }
-            // Re-fetch files after generating them
             schoolFiles = await listFilesInGCSFolder(schoolFolderPrefix);
           }
 
-          await addExcelFilesToZip(zip, schoolFolderPrefix, schoolFiles, basePrefix);
+          await addExcelFilesToZip(zip, schoolFolderPrefix, schoolFiles, basePrefix, school);
         }
-
       }
 
-      // Generate and send the ZIP file
       const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
       res.set('Content-Type', 'application/zip');
       res.set('Content-Disposition', `attachment; filename="${zipFilename}"`);
@@ -207,6 +185,7 @@ app.post('/api/create-and-download', async (req, res) => {
     res.status(500).send('Failed to create file or ZIP.');
   }
 });
+
 
 // POST endpoint to download the ZIP with GCS files
 app.post('/api/download-zip', async (req, res) => {
