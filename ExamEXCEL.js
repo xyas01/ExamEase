@@ -5,7 +5,7 @@ const stream = require('stream');
 
 const storage = new Storage({
     projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
-    keyFilename: "examease-435712-56128730b299.json",
+    keyFilename: "/etc/secrets/examease-435712-56128730b299.json",
 });
 
 const bucketName = 'examease_bucket';
