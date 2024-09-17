@@ -242,7 +242,7 @@ const NoteCard = ({ exam, notes, niveau, examName, onClose }) => {
 
       <button
         onClick={onClose}
-        className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded-lg flex items-center"
+        className="absolute top-2 right-2 border border-black text-black px-2 py-1 rounded-lg flex items-center"
       >
         &#10005;
       </button>
