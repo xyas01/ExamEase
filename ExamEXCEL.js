@@ -13,14 +13,20 @@ const bucketName = 'examease_bucket';
 // Function to upload Excel file to GCS
 async function uploadExcelToGCS(excelBuffer, excelFilePath) {
     const bucket = storage.bucket(bucketName);
-    const file = bucket.file(excelFilePath);
+    
+    // Replace backslashes with forward slashes in the file path
+    const formattedFilePath = excelFilePath.replace(/\\/g, '/');
+    
+    const file = bucket.file(formattedFilePath);
+    
     // Upload the file to GCS
     await file.save(excelBuffer);
-    console.log(`File uploaded to GCS at: ${excelFilePath}`);
+    console.log(`File uploaded to GCS at: ${formattedFilePath}`);
 
     // Return the public URL of the uploaded file
-    return `https://storage.googleapis.com/${bucketName}/${excelFilePath}`;
+    return `https://storage.googleapis.com/${bucketName}/${formattedFilePath}`;
 }
+
 
 // Function to generate the Excel file
 async function generateExamExcel(exam, year) {

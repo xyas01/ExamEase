@@ -17,12 +17,15 @@ async function uploadPDFToGCS(pdfBytes, filePath) {
   const bucket = storage.bucket(bucketName);
   const file = bucket.file(filePath);
 
+  // Replace backslashes with forward slashes in the file path
+  const formattedFilePath = filePath.replace(/\\/g, '/');
+
   // Upload the file to GCS
   await file.save(pdfBytes);
-  console.log(`File uploaded to GCS at: ${filePath}`);
+  console.log(`File uploaded to GCS at: ${formattedFilePath}`);
 
   // Return the public URL of the uploaded file
-  return `https://storage.googleapis.com/${bucketName}/${filePath}`;
+  return `https://storage.googleapis.com/${bucketName}/${formattedFilePath}`;
 }
 
 async function createPDF({ examName, module, niveau, note, school, className, year, lastName, firstName, number, parties, studentQCM, studentCLD, studentCLT, studentRPF, studentRLV, studentRLE, studentOLE }) {
