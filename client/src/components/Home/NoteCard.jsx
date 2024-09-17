@@ -104,7 +104,7 @@ const NoteCard = ({ exam, notes, niveau, examName, onClose }) => {
         selectedSchool: selectedSchool,
         selectedClass: selectedClass
       };
-
+  
       const response = await fetch('/api/create-and-download', {
         method: 'POST',
         headers: {
@@ -112,15 +112,18 @@ const NoteCard = ({ exam, notes, niveau, examName, onClose }) => {
         },
         body: JSON.stringify(payload),
       });
-
+  
       if (response.ok) {
         const disposition = response.headers.get('Content-Disposition');
-        const filename = disposition?.match(/filename="([^"]*)"/)?.[1];
-
+        const filename = disposition?.match(/filename="([^"]*)"/)?.[1] || 'downloaded_file';
+  
+        // If response is a file URL (likely for individual Excel file)
         if (selectedSchool && selectedClass) {
-          const fileUrl = await response.text();
+          const fileUrl = await response.text(); // The backend might return the file URL
+          // This ensures that the file is downloaded directly, avoiding CORS issues
           window.location.href = fileUrl;
         } else {
+          // For ZIP or blob response (like when downloading multiple files)
           const blob = await response.blob();
           const url = window.URL.createObjectURL(blob);
           const a = document.createElement('a');
@@ -129,6 +132,7 @@ const NoteCard = ({ exam, notes, niveau, examName, onClose }) => {
           document.body.appendChild(a);
           a.click();
           a.remove();
+          window.URL.revokeObjectURL(url); // Clean up after download
         }
       } else {
         console.error('Failed to download files');
@@ -139,6 +143,7 @@ const NoteCard = ({ exam, notes, niveau, examName, onClose }) => {
       setIsEXCELLoading(false);
     }
   };
+  
 
   return (
     <div className="relative flex flex-col border border-sky-500 mt-4 bg-white px-6 py-3 rounded-lg shadow-lg">
