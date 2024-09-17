@@ -24,7 +24,7 @@ async function uploadExcelToGCS(excelBuffer, excelFilePath) {
     console.log(`File uploaded to GCS at: ${formattedFilePath}`);
 
     // Return the public URL of the uploaded file
-    return `https://storage.googleapis.com/${bucketName}/${formattedFilePath}`;
+    return `${formattedFilePath}`;
 }
 
 
