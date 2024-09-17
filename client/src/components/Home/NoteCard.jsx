@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import Swap from '../../assets/Swap.svg';
 
-const NoteCard = ({ notes, niveau, examName, onClose }) => {
+const NoteCard = ({ exam, notes, niveau, examName, onClose }) => {
   const [selectedSchool, setSelectedSchool] = useState(null);
   const [selectedClass, setSelectedClass] = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: 'number', direction: 'asc' });
