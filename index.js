@@ -73,13 +73,6 @@ async function listFilesInGCSFolder(prefix) {
   return files; // Array of file objects
 }
 
-// Function to recursively list all files in a GCS folder (prefix)
-async function listFilesInGCSFolder(prefix) {
-  const bucket = storage.bucket(bucketName);
-  const [files] = await bucket.getFiles({ prefix });
-  return files; // Array of file objects
-}
-
 // Function to download file data from GCS
 async function downloadFileFromGCS(file) {
   const [fileData] = await file.download();
@@ -87,7 +80,7 @@ async function downloadFileFromGCS(file) {
 }
 
 // Function to recursively add Excel files to ZIP while preserving folder structure
-async function addFilesToZip(zip, folderPrefix, gcsFiles, basePrefix, zipFolderName) {
+async function addExcelFilesToZip(zip, folderPrefix, gcsFiles, basePrefix, zipFolderName) {
   for (const file of gcsFiles) {
     if (file.name.endsWith('.xlsx')) {
       const fileData = await downloadFileFromGCS(file);
@@ -170,7 +163,7 @@ app.post('/api/create-and-download', async (req, res) => {
           schoolFiles = await listFilesInGCSFolder(schoolFolderPrefix);
         }
 
-        await addFilesToZip(zip, schoolFolderPrefix, schoolFiles, basePrefix);
+        await addExcelFilesToZip(zip, schoolFolderPrefix, schoolFiles, basePrefix);
 
       } else {
         // If no school is selected, generate or fetch Excel files for all schools and their classes
@@ -197,7 +190,7 @@ app.post('/api/create-and-download', async (req, res) => {
             schoolFiles = await listFilesInGCSFolder(schoolFolderPrefix);
           }
 
-          await addFilesToZip(zip, schoolFolderPrefix, schoolFiles, basePrefix);
+          await addExcelFilesToZip(zip, schoolFolderPrefix, schoolFiles, basePrefix);
         }
 
       }
