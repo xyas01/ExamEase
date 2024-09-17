@@ -10,30 +10,16 @@ const storage = new Storage({
 
 const bucketName = 'examease_bucket';
 
-// Function to upload Excel file as a buffer to GCS
+// Function to upload Excel file to GCS
 async function uploadExcelToGCS(excelBuffer, excelFilePath) {
     const bucket = storage.bucket(bucketName);
     const file = bucket.file(excelFilePath);
-    const bufferStream = new stream.PassThrough();
-    bufferStream.end(excelBuffer);
+    // Upload the file to GCS
+    await file.save(excelBuffer);
+    console.log(`File uploaded to GCS at: ${excelFilePath}`);
 
-    await new Promise((resolve, reject) => {
-        bufferStream
-            .pipe(file.createWriteStream({
-                resumable: false,
-                gzip: true,
-                metadata: { contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }
-            }))
-            .on('finish', resolve)
-            .on('error', reject);
-    });
-
-    const [signedUrl] = await file.getSignedUrl({
-        action: 'read',
-        expires: Date.now() + 1000 * 60 * 60 * 24, // 24 hours expiration
-    });
-
-    return signedUrl;
+    // Return the public URL of the uploaded file
+    return `https://storage.googleapis.com/${bucketName}/${excelFilePath}`;
 }
 
 // Function to generate the Excel file
