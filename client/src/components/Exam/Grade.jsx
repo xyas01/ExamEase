@@ -1,7 +1,7 @@
 import React from 'react';
 import Logout from '../../assets/Logout.svg'; // Make sure you have this SVG file
 
-const Grade = ({ score, totalPoints, passingScore, details }) => {
+const Grade = ({ score, totalPoints, passingScore, details, isFullLoading }) => {
     const getGradeMessage = () => {
         if (totalPoints === 20) {
             if (score < 10) {
@@ -104,12 +104,14 @@ const Grade = ({ score, totalPoints, passingScore, details }) => {
                         </div>
                     ))}
                 </div>
-                <button
-                    onClick={handleLogout}
-                    className="w-12 h-12 mt-4 bg-red-500 rounded-xl flex items-center justify-center hover:opacity-80 transition duration-300"
-                >
-                    <img src={Logout} alt="Logout" className="w-6 h-6" />
-                </button>
+                {!isFullLoading && (
+                    <button
+                        onClick={handleLogout}
+                        className="w-12 h-12 mt-4 bg-red-500 rounded-xl flex items-center justify-center hover:opacity-80 transition duration-300"
+                    >
+                        <img src={Logout} alt="Logout" className="w-6 h-6" />
+                    </button>
+                )}
             </div>
         </div>
     );

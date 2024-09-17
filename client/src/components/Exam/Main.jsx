@@ -27,6 +27,7 @@ const Main = ({ userRole }) => {
     const [formattedResponses, setFormattedResponses] = useState([]);
     const [answerId, setAnswerId] = useState(null)
     const [fileUrl, setFileUrl] = useState('');
+    const [isFullLoading, setIsFullLoading] = useState(false);
 
 
     const localUsers = JSON.parse(localStorage.getItem('users')) || {};
@@ -59,7 +60,7 @@ const Main = ({ userRole }) => {
                     // Fetch studentQCM from localStorage if it exists
                     const studentRLE = localStorage.getItem('studentRLE');
                     const parsedStudentRLE = studentRLE ? JSON.parse(studentRLE) : null;
-                    
+
                     // Fetch studentQCM from localStorage if it exists
                     const studentOLE = localStorage.getItem('studentOLE');
                     const parsedStudentOLE = studentOLE ? JSON.parse(studentOLE) : null;
@@ -69,13 +70,13 @@ const Main = ({ userRole }) => {
                         examName: exam.name,
                         module: exam.module || '',
                         niveau: exam.niveau,
-                        note: totalScore,
-                        school: school,
-                        className: className,
+                        note: userRole === 'professeur' ? '.......' : totalScore,
+                        school: school || '................................................',
+                        className: className || '...............',
                         year: `${new Date().getFullYear()}/${new Date().getFullYear() + 1}`, // Dynamic year calculation
-                        lastName: lastname,
-                        firstName: firstname,
-                        number: number,
+                        lastName: lastname || '............................',
+                        firstName: firstname || '............................',
+                        number: number || '........',
                         parties: exam.parties,
                         studentQCM: parsedStudentQCM,
                         studentCLD: parsedStudentCLD,
@@ -127,7 +128,7 @@ const Main = ({ userRole }) => {
             navigate('/'); // Redirect to home page
         }
     }, [navigate]);
-    
+
     useEffect(() => {
         const updateExamAnswer = async () => {
 
@@ -151,6 +152,8 @@ const Main = ({ userRole }) => {
                 console.log('Exam answer updated with fileUrl successfully.');
             } catch (error) {
                 console.error('Error updating exam answer with fileUrl:', error);
+            } finally {
+                setIsFullLoading(false);  // Ensure this is set after update
             }
         };
 
@@ -265,6 +268,7 @@ const Main = ({ userRole }) => {
     const handleSubmitExam = async () => {
         setIsLoading(true);
         setFinalized(true);
+        setIsFullLoading(true);
 
         if (!isCalculated) {
             console.warn('Exam scores are not fully calculated yet.');
@@ -274,12 +278,12 @@ const Main = ({ userRole }) => {
 
         const user = JSON.parse(localStorage.getItem('users'));
         const userInfo = {
-            lastName: user[0].lastname,
-            firstName: user[0].firstname,
-            number: user[0].number,
-            school: user[0].school,
-            className: user[0].className,
-            totalScore: totalScore,
+            lastName: user ? user[0].lastname : '',
+            firstName: user ? user[0].firstname : '',
+            number: user ? user[0].number : '',
+            school: user ? user[0].school : '',
+            className: user ? user[0].className : '',
+            totalScore: totalScore || '',
             fileUrl: ''
         };
 
@@ -454,7 +458,7 @@ const Main = ({ userRole }) => {
                     </button>
                 </div>
 
-                {isCompleted && <Grade score={totalScore} totalPoints={totalPoints} passingScore={totalPoints / 2} details={details} />}
+                {isCompleted && <Grade score={totalScore} totalPoints={totalPoints} passingScore={totalPoints / 2} details={details} isFullLoading={isFullLoading} />}
             </div>
         </div>
     );

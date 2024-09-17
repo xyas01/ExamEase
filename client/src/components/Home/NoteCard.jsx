@@ -5,6 +5,8 @@ const NoteCard = ({ notes, niveau, examName, onClose }) => {
   const [selectedSchool, setSelectedSchool] = useState(null);
   const [selectedClass, setSelectedClass] = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: 'number', direction: 'asc' });
+  const [isPDFLoading, setIsPDFLoading] = useState(false);
+  const [isEXCELLoading, setIsEXCELLoading] = useState(false);
 
   // Extract unique schools
   const schools = [...new Set(notes.map(note => note.userInfo.school))];
@@ -51,6 +53,7 @@ const NoteCard = ({ notes, niveau, examName, onClose }) => {
   };
 
   const handleDownloadPDFs = async () => {
+    setIsPDFLoading(true);
     try {
       const response = await fetch('/api/download-zip', {
         method: 'POST',
@@ -83,9 +86,59 @@ const NoteCard = ({ notes, niveau, examName, onClose }) => {
       }
     } catch (error) {
       console.error('An error occurred:', error);
+    } finally {
+      setIsPDFLoading(false);
     }
   };
 
+  const handleCreateAndDownload = async () => {
+    setIsEXCELLoading(true);
+    try {
+      const payload = {
+        examName: exam.name,
+        module: exam.module || '',
+        niveau: exam.niveau,
+        notes: notes,
+        access: exam.access,
+        year: `${new Date().getFullYear()}/${new Date().getFullYear() + 1}`, // Dynamic year calculation
+        selectedSchool: selectedSchool,
+        selectedClass: selectedClass
+      };
+
+      const response = await fetch('http://localhost:5000/api/create-and-download', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        const disposition = response.headers.get('Content-Disposition');
+        const filename = disposition?.match(/filename="([^"]*)"/)?.[1];
+
+        if (selectedSchool && selectedClass) {
+          const fileUrl = await response.text();
+          window.location.href = fileUrl;
+        } else {
+          const blob = await response.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+        }
+      } else {
+        console.error('Failed to download files');
+      }
+    } catch (error) {
+      console.error('An error occurred:', error);
+    } finally {
+      setIsEXCELLoading(false);
+    }
+  };
 
   return (
     <div className="relative flex flex-col border border-sky-500 mt-4 bg-white px-6 py-3 rounded-lg shadow-lg">
@@ -170,12 +223,22 @@ const NoteCard = ({ notes, niveau, examName, onClose }) => {
         ))}
       </div>
 
-      <button
-        onClick={handleDownloadPDFs}
-        className="mt-4 bg-blue-500 text-white px-4 py-2 rounded-lg"
-      >
-        Télécharger zip
-      </button>
+      <div className='w-full flex gap-4'>
+        <button
+          onClick={handleDownloadPDFs}
+          className={`w-1/2 mt-4 ${isPDFLoading ? 'bg-gray-500 cursor-not-allowed' : 'bg-red-500'} text-white px-4 py-2 rounded-lg`}
+          disabled={isPDFLoading} // Disable button while loading
+        >
+          {isPDFLoading ? 'Téléchargement en cours...' : 'Télécharger zip (PDF)'}
+        </button>
+        <button
+          onClick={handleCreateAndDownload}
+          className={`w-1/2 mt-4 ${isEXCELLoading ? 'bg-gray-500 cursor-not-allowed' : 'bg-green-500'} text-white px-4 py-2 rounded-lg`}
+          disabled={isEXCELLoading} // Disable button while loading
+        >
+          {isEXCELLoading ? 'Téléchargement en cours...' : 'Télécharger zip (EXCEL)'}
+        </button>
+      </div>
 
       <button
         onClick={onClose}
