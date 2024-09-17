@@ -125,12 +125,20 @@ app.post('/api/create-and-download', async (req, res) => {
       const matchingFile = existingFiles.find(file => file.includes(selectedClass));
 
       if (matchingFile) {
-        // If the Excel file exists, redirect to download it
-        res.redirect(matchingFile);
+        // If the Excel file exists, stream it to the client instead of redirecting
+        const bucket = storage.bucket('examease_bucket');
+        const file = bucket.file(matchingFile);
+        res.set('Content-Disposition', `attachment; filename="${selectedClass}.xlsx"`);
+        res.set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        file.createReadStream().pipe(res);
       } else {
-        // If the Excel file doesn't exist, generate it and redirect to download it
+        // If the Excel file doesn't exist, generate it and stream it to the client
         const fileUrl = await generateExamExcel(exam, year);
-        res.redirect(fileUrl);
+        const bucket = storage.bucket('examease_bucket');
+        const file = bucket.file(fileUrl);
+        res.set('Content-Disposition', `attachment; filename="${selectedClass}.xlsx"`);
+        res.set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        file.createReadStream().pipe(res);
       }
     } else {
       // Handle ZIP creation if needed
