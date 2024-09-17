@@ -105,7 +105,7 @@ const NoteCard = ({ exam, notes, niveau, examName, onClose }) => {
         selectedClass: selectedClass
       };
 
-      const response = await fetch('http://localhost:5000/api/create-and-download', {
+      const response = await fetch('/api/create-and-download', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
