@@ -7,6 +7,7 @@ const { Storage } = require('@google-cloud/storage');
 const JSZip = require('jszip');
 const path = require('path');
 const { createPDF } = require('./ExamPDF');
+const { generateExamExcel } = require('./ExamEXCEL');
 
 require('dotenv').config();
 
