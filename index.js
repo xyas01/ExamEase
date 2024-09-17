@@ -88,7 +88,7 @@ async function downloadFileFromGCS(file) {
 // Function to recursively add Excel files to ZIP while preserving folder structure
 async function addFilesToZip(zip, folderPrefix, gcsFiles, basePrefix, zipFolderName) {
   for (const file of gcsFiles) {
-    if (file.name.endsWith('.xls')) {
+    if (file.name.endsWith('.xlsx')) {
       const fileData = await downloadFileFromGCS(file);
       const relativePath = file.name.replace(folderPrefix, ''); // Remove folder prefix to get only filename
       zip.file(path.join(zipFolderName, relativePath), fileData); // Add file to ZIP under desired folder
