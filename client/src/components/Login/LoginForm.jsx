@@ -18,7 +18,7 @@ const LoginForm = ({ role }) => {
     // Fetch schools from the server
     const fetchSchools = async () => {
       try {
-        const profId = '66ddcbdcedfdb4607597b0ed'; // Adjust as needed
+        const profId = '68d5a6dc507b45eac4573b26'; // Adjust as needed
         const response = await axios.get(`/api/teacher/${profId}/schools`);
         setSchools(response.data.schools);
       } catch (error) {
