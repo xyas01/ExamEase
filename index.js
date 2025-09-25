@@ -34,7 +34,7 @@ const multerStorage = multer.diskStorage({
   }
 });
 
-const upload = multer({ multerStorage });
+const upload = multer({ storage:multerStorage });
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGO_URL)
