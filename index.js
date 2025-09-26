@@ -54,9 +54,39 @@ app.post('/api/create-document', async (req, res) => {
   try {
     const { examName, module, niveau, note, school, className, year, lastName, firstName, number, parties, studentQCM, studentCLD, studentCLT, studentRPF, studentRLV, studentRLE, studentOLE } = req.body;
 
-    if (!examName || !module || !niveau || !note || !school || !className || !year || !lastName || !firstName || !number || !parties) {
-      return res.status(400).send('Missing required fields');
-    }
+if (!examName) {
+  return res.status(400).send('Missing required field: examName');
+}
+if (!module) {
+  return res.status(400).send('Missing required field: module');
+}
+if (!niveau) {
+  return res.status(400).send('Missing required field: niveau');
+}
+if (!note) {
+  return res.status(400).send('Missing required field: note');
+}
+if (!school) {
+  return res.status(400).send('Missing required field: school');
+}
+if (!className) {
+  return res.status(400).send('Missing required field: className');
+}
+if (!year) {
+  return res.status(400).send('Missing required field: year');
+}
+if (!lastName) {
+  return res.status(400).send('Missing required field: lastName');
+}
+if (!firstName) {
+  return res.status(400).send('Missing required field: firstName');
+}
+if (!number) {
+  return res.status(400).send('Missing required field: number');
+}
+if (!parties) {
+  return res.status(400).send('Missing required field: parties');
+}
 
     const fileUrl = await createPDF({ examName, module, niveau, note, school, className, year, lastName, firstName, number, parties, studentQCM, studentCLD, studentCLT, studentRPF, studentRLV, studentRLE, studentOLE });
 
