@@ -13,7 +13,7 @@ const storage = new Storage({
 const bucketName = 'examease-bucket'; // Your Google Cloud bucket name
 
 // Function to upload the PDF to Google Cloud Storage
-async function uploadPDFToGCS(pdfBytes, filename) {
+async function uploadPDFToGCS(pdfBytes, filePath) {
   try {
     const bucket = storage.bucket(bucketName);
     const file = bucket.file(filePath);
