@@ -10,28 +10,31 @@ const storage = new Storage({
   keyFilename: "/etc/secrets/examease-435712-56128730b299.json", // Path to your GCS service account key file
 });
 
-const bucketName = 'examease_bucket'; // Your Google Cloud bucket name
+const bucketName = 'examease-bucket'; // Your Google Cloud bucket name
 
 // Function to upload the PDF to Google Cloud Storage
-async function uploadPDFToGCS(pdfBytes, filePath) {
-  const bucket = storage.bucket(bucketName);
+async function uploadPDFToGCS(pdfBytes, filename) {
+  try {
+    const bucket = storage.bucket(bucketName);
+    const file = bucket.file(`pdfs/${filename}`);
+    
+    console.log("📤 Trying upload:", filename, "to bucket:", bucketName);
 
-  // Normalize file path (only keep relative name, no backslashes)
-  const formattedFilePath = path.posix.join('pdfs', path.basename(filePath));
+    await file.save(pdfBytes, {
+      contentType: 'application/pdf',
+      resumable: false,
+      public: true,
+    });
 
-  const file = bucket.file(formattedFilePath);
+    console.log("✅ Uploaded:", filename);
 
-  // Upload the file
-  await file.save(pdfBytes, {
-    contentType: 'application/pdf',
-    public: true, // Make it public directly
-  });
-
-  console.log(`File uploaded to GCS at: ${formattedFilePath}`);
-
-  // Return the public URL
-  return `https://storage.googleapis.com/${bucketName}/${formattedFilePath}`;
+    return `https://storage.googleapis.com/${bucketName}/pdfs/${filename}`;
+  } catch (err) {
+    console.error("❌ Upload failed:", err.message, err);
+    throw err;
+  }
 }
+
 
 async function createPDF({ examName, module, niveau, note, school, className, year, lastName, firstName, number, parties, studentQCM, studentCLD, studentCLT, studentRPF, studentRLV, studentRLE, studentOLE }) {
   try {
