@@ -184,36 +184,28 @@ const Main = ({ userRole }) => {
 
     const handleScoreUpdate = useCallback((type, score, points) => {
         setDetails(prevDetails => {
-            const updatedDetails = { ...prevDetails };
-            const existingEntry = updatedDetails[type];
-
-            let newTotalScore;
-            let newTotalPoints = Object.values(prevDetails).reduce((sum, [, points]) => sum + points, 0);
-
-            if (existingEntry) {
-                const [oldScore] = existingEntry;
-                updatedDetails[type] = [score, points];
-                newTotalScore = totalScore - oldScore + score;
-
-            } else {
-                updatedDetails[type] = [score, points];
-                newTotalScore = totalScore + score;
-            }
-
-            // Adjust points if total points is 19
-            if (newTotalPoints === 19) {
-                newTotalPoints += 1;
-            }
-
-
-
-            // Update state with new values
-            setTotalPoints(newTotalPoints);
-            setTotalScore(newTotalScore);
-
-            return updatedDetails;
-        });
-    }, [totalScore]);
+        const updatedDetails = { ...prevDetails };
+        const existingEntry = updatedDetails[type];
+    
+        // Update entry
+        updatedDetails[type] = [score, points];
+    
+        // Recalculate totals from updated details
+        const newTotalPoints = Object.values(updatedDetails)
+          .reduce((sum, [, pts]) => sum + pts, 0);
+    
+        const newTotalScore = Object.values(updatedDetails)
+          .reduce((sum, [scr]) => sum + scr, 0);
+    
+        // Adjust points if total points is 19
+        const adjustedPoints = newTotalPoints === 19 ? newTotalPoints + 1 : newTotalPoints;
+    
+        setTotalPoints(adjustedPoints);
+        setTotalScore(newTotalScore);
+    
+        return updatedDetails;
+      });
+    }, []);
 
 
 
