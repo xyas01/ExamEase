@@ -53,6 +53,8 @@ app.post('/api/upload-image', upload.single('image'), (req, res) => {
 app.post('/api/create-document', async (req, res) => {
   try {
     const { examName, module, niveau, note, school, className, year, lastName, firstName, number, parties, studentQCM, studentCLD, studentCLT, studentRPF, studentRLV, studentRLE, studentOLE } = req.body;
+    
+    console.log("📥 Incoming request body:", req.body);
 
     if (!examName) {
       return res.status(400).send('Missing required field: examName');
@@ -87,6 +89,13 @@ app.post('/api/create-document', async (req, res) => {
     }
 
     const fileUrl = await createPDF({ examName, module, niveau, note, school, className, year, lastName, firstName, number, parties, studentQCM, studentCLD, studentCLT, studentRPF, studentRLV, studentRLE, studentOLE });
+    
+    console.log("✅ PDF generated:", fileUrl);
+
+    if (!fileUrl) {
+      return res.status(500).json({ message: "PDF generation returned empty fileUrl" });
+    }
+
 
     res.json({ fileUrl });
   } catch (error) {
