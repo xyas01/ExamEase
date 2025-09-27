@@ -18,7 +18,7 @@ async function uploadPDFToGCS(pdfBytes, filePath) {
     const bucket = storage.bucket(bucketName);
     const file = bucket.file(filePath);
     
-    console.log("📤 Trying upload:", filename, "to bucket:", bucketName);
+    console.log("📤 Trying upload to bucket:", bucketName);
 
     // Upload the file to GCS
     await file.save(pdfBytes);
