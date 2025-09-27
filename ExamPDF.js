@@ -15,16 +15,21 @@ const bucketName = 'examease_bucket'; // Your Google Cloud bucket name
 // Function to upload the PDF to Google Cloud Storage
 async function uploadPDFToGCS(pdfBytes, filePath) {
   const bucket = storage.bucket(bucketName);
-  const file = bucket.file(filePath);
 
-  // Replace backslashes with forward slashes in the file path
-  const formattedFilePath = filePath.replace(/\\/g, '/');
+  // Normalize file path (only keep relative name, no backslashes)
+  const formattedFilePath = path.posix.join('pdfs', path.basename(filePath));
 
-  // Upload the file to GCS
-  await file.save(pdfBytes);
+  const file = bucket.file(formattedFilePath);
+
+  // Upload the file
+  await file.save(pdfBytes, {
+    contentType: 'application/pdf',
+    public: true, // Make it public directly
+  });
+
   console.log(`File uploaded to GCS at: ${formattedFilePath}`);
 
-  // Return the public URL of the uploaded file
+  // Return the public URL
   return `https://storage.googleapis.com/${bucketName}/${formattedFilePath}`;
 }
 
