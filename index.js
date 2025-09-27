@@ -19,7 +19,7 @@ const storage = new Storage({
   projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
   keyFilename: "/etc/secrets/examease-435712-56128730b299.json", // Path to your GCS service account key file
 });
-const bucketName = 'examease_bucket'; // Your Google Cloud bucket name
+const bucketName = 'examease-bucket'; // Your Google Cloud bucket name
 
 // Set up static file serving for the assets folder
 app.use('/assets', express.static('assets'));
