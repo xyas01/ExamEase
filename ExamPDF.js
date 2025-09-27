@@ -16,19 +16,16 @@ const bucketName = 'examease-bucket'; // Your Google Cloud bucket name
 async function uploadPDFToGCS(pdfBytes, filename) {
   try {
     const bucket = storage.bucket(bucketName);
-    const file = bucket.file(`pdfs/${filename}`);
+    const file = bucket.file(filePath);
     
     console.log("📤 Trying upload:", filename, "to bucket:", bucketName);
 
-    await file.save(pdfBytes, {
-      contentType: 'application/pdf',
-      resumable: false,
-      public: true,
-    });
-
-    console.log("✅ Uploaded:", filename);
-
-    return `https://storage.googleapis.com/${bucketName}/pdfs/${filename}`;
+    // Upload the file to GCS
+    await file.save(pdfBytes);
+    console.log(`File uploaded to GCS at: ${filePath}`);
+  
+    // Return the public URL of the uploaded file
+    return `https://storage.googleapis.com/${bucketName}/${filePath}`;
   } catch (err) {
     console.error("❌ Upload failed:", err.message, err);
     throw err;
@@ -38,6 +35,9 @@ async function uploadPDFToGCS(pdfBytes, filename) {
 
 async function createPDF({ examName, module, niveau, note, school, className, year, lastName, firstName, number, parties, studentQCM, studentCLD, studentCLT, studentRPF, studentRLV, studentRLE, studentOLE }) {
   try {
+
+    console.log("Starting PDF generation");
+    
     const pdfDoc = await PDFDocument.create();
     const timesRomanBoldFont = await pdfDoc.embedFont(StandardFonts.TimesRomanBold);
     const timesRomanFont = await pdfDoc.embedFont(StandardFonts.TimesRoman);
@@ -881,6 +881,8 @@ async function createPDF({ examName, module, niveau, note, school, className, ye
         currentY -= 345;
       }
     });
+
+    console.log('PDF generation finished, uploading...');
 
     // Save PDF to Google Cloud Storage
     const pdfFileName = `${number}- ${lastName} ${firstName}.pdf`;
