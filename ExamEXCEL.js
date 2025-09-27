@@ -8,7 +8,7 @@ const storage = new Storage({
     keyFilename: "/etc/secrets/examease-435712-56128730b299.json",
 });
 
-const bucketName = 'examease_bucket';
+const bucketName = 'examease-bucket';
 
 // Function to upload Excel file to GCS
 async function uploadExcelToGCS(excelBuffer, excelFilePath) {
