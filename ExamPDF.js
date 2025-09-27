@@ -883,9 +883,8 @@ async function createPDF({ examName, module, niveau, note, school, className, ye
     });
 
     // Save PDF to Google Cloud Storage
-    const dir = path.join(niveau, examName, school, className); // Folder structure in GCS
     const pdfFileName = `${number}- ${lastName} ${firstName}.pdf`;
-    const pdfFilePath = path.join(dir, pdfFileName);
+    const pdfFilePath = `${niveau}/${examName}/${school}/${className}/${pdfFileName}`;
     const pdfBytes = await pdfDoc.save();
 
     // Upload the PDF to GCS
