@@ -7,37 +7,26 @@ const path = require('path');
 // Initialize the GCS client
 const storage = new Storage({
   projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
-  keyFilename: "/etc/secrets/examease-435712-56128730b299.json", // Path to your GCS service account key file
+  keyFilename: "examease-435712-56128730b299.json", // Path to your GCS service account key file
 });
 
 const bucketName = 'examease-bucket'; // Your Google Cloud bucket name
 
 // Function to upload the PDF to Google Cloud Storage
 async function uploadPDFToGCS(pdfBytes, filePath) {
-  try {
-    const bucket = storage.bucket(bucketName);
-    const file = bucket.file(filePath);
-    
-    console.log("📤 Trying upload to bucket:", bucketName);
+  const bucket = storage.bucket(bucketName);
+  const file = bucket.file(filePath);
 
-    // Upload the file to GCS
-    await file.save(pdfBytes);
-    console.log(`File uploaded to GCS at: ${filePath}`);
-  
-    // Return the public URL of the uploaded file
-    return `https://storage.googleapis.com/${bucketName}/${filePath}`;
-  } catch (err) {
-    console.error("❌ Upload failed:", err.message, err);
-    throw err;
-  }
+  // Upload the file to GCS
+  await file.save(pdfBytes);
+  console.log(`File uploaded to GCS at: ${filePath}`);
+
+  // Return the public URL of the uploaded file
+  return `https://storage.googleapis.com/${bucketName}/${filePath}`;
 }
-
 
 async function createPDF({ examName, module, niveau, note, school, className, year, lastName, firstName, number, parties, studentQCM, studentCLD, studentCLT, studentRPF, studentRLV, studentRLE, studentOLE }) {
   try {
-
-    console.log("Starting PDF generation");
-    
     const pdfDoc = await PDFDocument.create();
     const timesRomanBoldFont = await pdfDoc.embedFont(StandardFonts.TimesRomanBold);
     const timesRomanFont = await pdfDoc.embedFont(StandardFonts.TimesRoman);
@@ -47,35 +36,107 @@ async function createPDF({ examName, module, niveau, note, school, className, ye
     const customFontBytes = fs.readFileSync(path.join(__dirname, 'fonts', 'DoulosSILCompact-R.ttf'));
     const customFont = await pdfDoc.embedFont(customFontBytes);
 
-
-    const page = pdfDoc.addPage([595, 842]);
-    const { width, height } = page.getSize();
+    // Page dimensions and constants
+    const pageWidth = 595;
+    const pageHeight = 842;
     const margin = 36;
     const cellHeight = 20;
     const cellMargin = 5;
     const borderThickness = 4;
     const columnGap = 20;
-    const columnWidth = (width - 2 * margin - columnGap) / 2;
+    const columnWidth = (pageWidth - 2 * margin - columnGap) / 2;
 
-    // Draw border
-    page.drawRectangle({
+    let pages = [];
+    let currentPage = pdfDoc.addPage([pageWidth, pageHeight]);
+    pages.push(currentPage);
+    let currentY = pageHeight - margin;
+
+    // Function to add new page if needed
+    function checkPageBreak(requiredSpace) {
+      if (currentY - requiredSpace < margin + 50) {
+        currentPage = pdfDoc.addPage([pageWidth, pageHeight]);
+        pages.push(currentPage);
+        currentY = pageHeight - margin;
+        
+        // Draw border on new page
+        currentPage.drawRectangle({
+          x: margin - 10,
+          y: margin - 10,
+          width: pageWidth - (margin * 2) + 20,
+          height: pageHeight - (margin * 2) + 20,
+          borderColor: rgb(0, 0, 0),
+          borderWidth: borderThickness,
+        });
+        
+        return true;
+      }
+      return false;
+    }
+
+    // Function to wrap text to multiple lines
+    function drawWrappedText(text, startX, startY, maxWidth, font, fontSize, color, page) {
+      const words = text.split(' ');
+      let currentLine = '';
+      let currentX = startX;
+      let currentLineY = startY;
+      const lineHeight = fontSize + 2;
+
+      for (let i = 0; i < words.length; i++) {
+        const testLine = currentLine + (currentLine === '' ? '' : ' ') + words[i];
+        const testWidth = font.widthOfTextAtSize(testLine, fontSize);
+
+        if (testWidth <= maxWidth || currentLine === '') {
+          currentLine = testLine;
+        } else {
+          // Draw current line
+          page.drawText(currentLine, {
+            x: currentX,
+            y: currentLineY,
+            size: fontSize,
+            font: font,
+            color: color,
+          });
+          
+          currentLineY -= lineHeight;
+          currentLine = words[i];
+        }
+      }
+      
+      // Draw the last line
+      if (currentLine !== '') {
+        page.drawText(currentLine, {
+          x: currentX,
+          y: currentLineY,
+          size: fontSize,
+          font: font,
+          color: color,
+        });
+        currentLineY -= lineHeight;
+      }
+      
+      return currentLineY; // Return the final Y position
+    }
+
+    // Draw border on first page
+    currentPage.drawRectangle({
       x: margin - 10,
       y: margin - 10,
-      width: width - (margin * 2) + 20,
-      height: height - (margin * 2) + 20,
+      width: pageWidth - (margin * 2) + 20,
+      height: pageHeight - (margin * 2) + 20,
       borderColor: rgb(0, 0, 0),
       borderWidth: borderThickness,
     });
 
     // Draw examName
-    page.drawText(examName, {
-      x: (width - timesRomanBoldFont.widthOfTextAtSize(examName, 32)) / 2,
-      y: height - margin - 23,
+    currentPage.drawText(examName, {
+      x: (pageWidth - timesRomanBoldFont.widthOfTextAtSize(examName, 32)) / 2,
+      y: currentY - 23,
       size: 32,
       font: timesRomanBoldFont,
       color: rgb(0, 0, 0),
-      maxWidth: width - 2 * margin,
+      maxWidth: pageWidth - 2 * margin,
     });
+    currentY -= 50;
 
     // Define table data
     const tableData = [
@@ -85,16 +146,15 @@ async function createPDF({ examName, module, niveau, note, school, className, ye
     ];
 
     // Draw table data
-    let currentY = height - margin - cellHeight - 35;
     tableData.forEach((row) => {
       let currentX = margin;
       row.forEach((cell) => {
         if (cell.merged) {
-          const cellWidth = cell.width * (width - 2 * margin);
+          const cellWidth = cell.width * (pageWidth - 2 * margin);
           const textWidth = timesRomanBoldFont.widthOfTextAtSize(cell.title, cell.size);
           const textHeight = cell.size;
 
-          page.drawText(cell.title, {
+          currentPage.drawText(cell.title, {
             x: currentX + (cellWidth - textWidth) / 2,
             y: currentY + (cellHeight - textHeight) / 2,
             size: cell.size || 12,
@@ -102,7 +162,7 @@ async function createPDF({ examName, module, niveau, note, school, className, ye
             color: cell.color || rgb(0, 0, 0),
           });
         } else {
-          page.drawText(cell.title, {
+          currentPage.drawText(cell.title, {
             x: currentX,
             y: currentY + cellMargin,
             size: 12,
@@ -113,13 +173,11 @@ async function createPDF({ examName, module, niveau, note, school, className, ye
           if (cell.title === '') {
             const colonIndex = cell.value.indexOf(':');
 
-            // If ':' is found, split the text
             if (colonIndex !== -1) {
-              const boldText = cell.value.substring(0, colonIndex + 1); // Include the ':' in the bold part
+              const boldText = cell.value.substring(0, colonIndex + 1);
               const regularText = cell.value.substring(colonIndex + 1);
 
-              // Draw bold part
-              page.drawText(boldText, {
+              currentPage.drawText(boldText, {
                 x: currentX,
                 y: currentY + cellMargin,
                 size: 12,
@@ -127,8 +185,7 @@ async function createPDF({ examName, module, niveau, note, school, className, ye
                 color: rgb(0, 0, 0),
               });
 
-              // Draw regular part
-              page.drawText(regularText, {
+              currentPage.drawText(regularText, {
                 x: currentX + timesRomanBoldFont.widthOfTextAtSize(boldText, 12),
                 y: currentY + cellMargin,
                 size: 12,
@@ -136,9 +193,8 @@ async function createPDF({ examName, module, niveau, note, school, className, ye
                 color: rgb(0, 0, 0),
               });
             }
-
           } else {
-            page.drawText(cell.value, {
+            currentPage.drawText(cell.value, {
               x: currentX + cellMargin + 50,
               y: currentY + cellMargin,
               size: 12,
@@ -146,32 +202,30 @@ async function createPDF({ examName, module, niveau, note, school, className, ye
               color: rgb(0, 0, 0),
             });
           }
-
         }
-
-        currentX += cell.width * (width - 2 * margin);
+        currentX += cell.width * (pageWidth - 2 * margin);
       });
       currentY -= cellHeight;
     });
 
-    page.drawLine({
+    // Draw horizontal line
+    currentPage.drawLine({
       start: { x: margin - 10, y: currentY + 15 },
-      end: { x: width - margin + 10, y: currentY + 15 },
+      end: { x: pageWidth - margin + 10, y: currentY + 15 },
       thickness: borderThickness,
       color: rgb(0, 0, 0),
       opacity: 1,
-    })
+    });
+    currentY -= 20;
 
-    const textSize = 8; // Font size for text
-    const circleSize = 5; // Circle size for "Oui" and "Non"
+    // Draw bonus points section
+    const textSize = 8;
+    const circleSize = 5;
     const circleRadius = circleSize / 2;
-    const gap = 50; // Gap between "Oui" and "Non"
+    const gap = 50;
 
-    currentY -= 5;
-
-    // Step 1: Draw the text first
     const text = '+1 pt pour la rédaction et la propreté de la copie :';
-    page.drawText(text, {
+    currentPage.drawText(text, {
       x: margin,
       y: currentY,
       size: textSize,
@@ -179,23 +233,24 @@ async function createPDF({ examName, module, niveau, note, school, className, ye
       color: rgb(0, 0, 0),
     });
 
-    // Step 2: Calculate the width of the text and remaining space for centering the block
     const textWidth = timesRomanBoldFont.widthOfTextAtSize(text, textSize);
-    const availableWidth = width - margin * 2; // Total available width between margins
-    const remainingSpace = availableWidth - textWidth; // Remaining space after the text
+    const availableWidth = pageWidth - margin * 2;
+    const remainingSpace = availableWidth - textWidth;
 
-    // Step 3: Calculate the width of the "Oui ○" and "Non ○" block
     const ouiText = 'Oui';
     const nonText = 'Non';
+    const sansCopieText = 'Sans copie';
     const ouiWidth = timesRomanFont.widthOfTextAtSize(ouiText, textSize);
     const nonWidth = timesRomanFont.widthOfTextAtSize(nonText, textSize);
-    const blockWidth = ouiWidth + circleSize + gap + nonWidth + circleSize; // Total block width for "Oui ○ Non ○"
+    const sansCopieWidth = timesRomanFont.widthOfTextAtSize(sansCopieText, textSize);
+    
+    const smallGap = 25; // Smaller gap between options
+    const blockWidth = ouiWidth + circleSize + smallGap + nonWidth + circleSize + smallGap + sansCopieWidth + circleSize;
 
-    // Step 4: Center the block in the remaining space
-    const blockX = margin + textWidth + (remainingSpace - blockWidth) / 2; // X position for the block
+    const blockX = margin + textWidth + (remainingSpace - blockWidth) / 2;
 
-    // Step 5: Draw "Oui" and its circle
-    page.drawText(ouiText, {
+    // Draw "Oui" option
+    currentPage.drawText(ouiText, {
       x: blockX,
       y: currentY,
       size: textSize,
@@ -203,19 +258,19 @@ async function createPDF({ examName, module, niveau, note, school, className, ye
       color: rgb(0, 0, 0),
     });
 
-    page.drawCircle({
-      x: blockX + ouiWidth + circleRadius + 10, // Position the circle next to "Oui"
-      y: currentY + circleRadius, // Center the circle vertically with the text
+    currentPage.drawCircle({
+      x: blockX + ouiWidth + circleRadius + 8,
+      y: currentY + circleRadius,
       size: circleSize,
       borderWidth: 1,
-      color: rgb(0, 0, 0), // Circle border color
-      borderColor: rgb(0, 0, 0), // Border only, no fill
-      opacity: 0, // Make sure the circle has no fill
+      color: rgb(0, 0, 0),
+      borderColor: rgb(0, 0, 0),
+      opacity: 0,
     });
 
-    // Step 6: Draw "Non" and its circle with the specified gap
-    const nonX = blockX + ouiWidth + circleSize + gap;
-    page.drawText(nonText, {
+    // Draw "Non" option
+    const nonX = blockX + ouiWidth + circleSize + smallGap;
+    currentPage.drawText(nonText, {
       x: nonX,
       y: currentY,
       size: textSize,
@@ -223,84 +278,112 @@ async function createPDF({ examName, module, niveau, note, school, className, ye
       color: rgb(0, 0, 0),
     });
 
-    page.drawCircle({
-      x: nonX + nonWidth + circleRadius + 10, // Position the circle next to "Non"
-      y: currentY + circleRadius, // Center the circle vertically with the text
+    currentPage.drawCircle({
+      x: nonX + nonWidth + circleRadius + 8,
+      y: currentY + circleRadius,
       size: circleSize,
       borderWidth: 1,
-      color: rgb(0, 0, 0), // Circle border color
-      borderColor: rgb(0, 0, 0), // Border only, no fill
-      opacity: 0, // Make sure the circle has no fill
+      color: rgb(0, 0, 0),
+      borderColor: rgb(0, 0, 0),
+      opacity: 0,
     });
 
-    currentY -= 15
+    // Draw "Sans copie" option
+    const sansCopieX = nonX + nonWidth + circleSize + smallGap;
+    currentPage.drawText(sansCopieText, {
+      x: sansCopieX,
+      y: currentY,
+      size: textSize,
+      font: timesRomanFont,
+      color: rgb(0, 0, 0),
+    });
+
+    currentPage.drawCircle({
+      x: sansCopieX + sansCopieWidth + circleRadius + 8,
+      y: currentY + circleRadius,
+      size: circleSize,
+      borderWidth: 1,
+      color: rgb(0, 0, 0),
+      borderColor: rgb(0, 0, 0),
+      opacity: 0,
+    });
+
+    currentY -= 30;
+
     // Draw parties and exercises
     parties.forEach((party, partyIndex) => {
-      if (partyIndex === parties.length - 1) {
-        currentY += 180
-      }
-      let partStartY = currentY; // Increase space between party name and exercise question
+      // Check if we need a new page for party header
+      checkPageBreak(30);
 
       // Draw party name
-      page.drawText(`${party.name} :`, {
+      currentPage.drawText(`${party.name} :`, {
         x: margin,
-        y: partStartY,
+        y: currentY,
         size: 10,
         font: timesRomanBoldFont,
         color: rgb(0, 0, 0),
       });
-
-      partStartY -= 10;
+      currentY -= 15;
 
       party.exercises.forEach(async (exercise, exerciseIndex) => {
-        let exerciseY = partStartY;
-
         if (exercise.type === 'QCM') {
           const studentScore = studentQCM.computedScore;
           const totalPoints = exercise.data.points || exercise.points;
+          
+          // Calculate required space
+          const questionsCount = exercise.data.questions.length;
+          const requiredSpace = 30 + (questionsCount * 60); // Estimate space needed
+          checkPageBreak(requiredSpace);
 
           // Draw QCM title with student score
-          page.drawText(`${exerciseIndex + 1}- Choisir la bonne réponse : `, {
+          currentPage.drawText(`${exerciseIndex + 1}- Choisir la bonne réponse : `, {
             x: margin,
-            y: exerciseY,
+            y: currentY,
             size: 8,
             font: timesRomanFont,
             color: rgb(0, 0, 0),
           });
 
-          page.drawText(`(${studentScore} / ${totalPoints} pts)`, {
+          currentPage.drawText(`(${studentScore} / ${totalPoints} pts)`, {
             x: margin + timesRomanFont.widthOfTextAtSize(`${exerciseIndex + 1}- Choisir la bonne réponse : `, 8),
-            y: exerciseY,
+            y: currentY,
             size: 8,
             font: timesRomanBoldFont,
             color: rgb(1, 0, 0),
           });
+          currentY -= 15;
 
-          // Adjust Y position for questions and answers
-          exerciseY -= 10;
           exercise.data.questions.forEach((q, questionIndex) => {
             const columnX = margin + (questionIndex % 2) * (columnWidth + columnGap) + 5;
-            const columnY = exerciseY - Math.floor(questionIndex / 2) * (2 * cellHeight);
+            const columnY = currentY - Math.floor(questionIndex / 2) * 50;
+
+            // Check if we need space for this question
+            if (columnY < margin + 60) {
+              checkPageBreak(100);
+              currentY = pageHeight - margin - 20;
+            }
+
+            const actualY = currentY - Math.floor(questionIndex / 2) * 50;
 
             // Display the question
-            page.drawText(`${q.question}`, {
+            currentPage.drawText(`${q.question}`, {
               x: columnX,
-              y: columnY,
+              y: actualY,
               size: 8,
               font: timesRomanFont,
               color: rgb(0, 0, 0),
             });
 
-            // Adjust answer position
+            // Display answers
             q.answers.forEach((answer, index) => {
-              const answerY = columnY - (index + 1) * (cellHeight / 2) + 5;
+              const answerY = actualY - (index + 1) * 10;
               const userAnswer = studentQCM.userResponses[`${partyIndex}-${q.id}`];
               const isUserAnswer = index === userAnswer;
               const answerColor = isUserAnswer ? (index === q.correctAnswer ? rgb(0, 1, 0) : rgb(1, 0, 0)) : rgb(0, 0, 0);
 
-              page.drawText(`• ${answer}`, {
+              currentPage.drawText(`• ${answer}`, {
                 x: columnX + 10,
-                y: answerY - 5,
+                y: answerY,
                 size: 8,
                 font: timesRomanFont,
                 color: answerColor,
@@ -308,364 +391,592 @@ async function createPDF({ examName, module, niveau, note, school, className, ye
             });
           });
 
-          // Adjust Y position for the next exercise
-          exerciseY -= (exercise.data.questions.length * 3 + 5) * cellHeight;
+          currentY -= Math.ceil(exercise.data.questions.length / 2) * 50 + 20;
+
         } else if (exercise.type === 'CLD') {
           const studentScore = studentCLD.computedScore;
           const totalPoints = exercise.data.points;
+          
+          checkPageBreak(250); // CLD needs more space
 
           // Draw CLD title with student score
-          page.drawText(`${exerciseIndex + 1}- Compléter le dessin : `, {
+          currentPage.drawText(`${exerciseIndex + 1}- Compléter le dessin : `, {
             x: margin,
-            y: exerciseY - 92,
+            y: currentY,
             size: 8,
             font: timesRomanFont,
             color: rgb(0, 0, 0),
           });
 
-          page.drawText(`(${studentScore} / ${totalPoints} pts)`, {
+          currentPage.drawText(`(${studentScore} / ${totalPoints} pts)`, {
             x: margin + timesRomanFont.widthOfTextAtSize(`${exerciseIndex + 1}- Compléter le dessin : `, 8),
-            y: exerciseY - 92,
+            y: currentY,
             size: 8,
             font: timesRomanBoldFont,
             color: rgb(1, 0, 0),
           });
+          currentY -= 15;
 
           // Display the shuffled responses under the question
           const shuffledResponses = exercise.data.shuffledResponses.join(' - ');
-          exerciseY -= 10;
-          page.drawText(shuffledResponses, {
-            x: (width - timesRomanFont.widthOfTextAtSize(shuffledResponses, 10)) / 2,
-            y: exerciseY - 92,
-            size: 8,
-            font: timesRomanFont,
-            color: rgb(0, 0, 0),
-          });
+          
+          const maxWidth = pageWidth - 2 * margin;
+          const centerX = (pageWidth - Math.min(timesRomanFont.widthOfTextAtSize(shuffledResponses, 8), maxWidth)) / 2;
+          
+          currentY = drawWrappedText(shuffledResponses, centerX, currentY, maxWidth, timesRomanFont, 8, rgb(0, 0, 0), currentPage);
+          currentY -= 10;
 
-          // Adjust Y position for answers
-          exerciseY -= 10;
+          // Display answers
           studentCLD.formattedResponses.forEach((answer, index) => {
-            const answerY = exerciseY - index * (cellHeight / 2) - 92;
             const isAnswer = answer !== '';
             const isCorrect = answer === exercise.data.responses[index];
             const answerColor = isAnswer ? (isCorrect ? rgb(0, 1, 0) : rgb(1, 0, 0)) : rgb(0, 0, 0);
 
-            // Display the answer with color
-            page.drawText(`${index + 1}. ${answer}`, {
+            currentPage.drawText(`${index + 1}. ${answer}`, {
               x: margin + 10,
-              y: answerY - 5,
+              y: currentY,
               size: 8,
               font: timesRomanFont,
               color: answerColor,
             });
+            currentY -= 12;
           });
 
-          // Load and display the image representing "le dessin"
-          const imageFileName = exercise.data.image.split('/').pop(); // Extract the image file name
-          const imagePath = path.join(__dirname, 'assets', imageFileName);
-          if (fs.existsSync(imagePath)) {
-            const imageBytes = fs.readFileSync(imagePath);
-            const embeddedImage = await pdfDoc.embedPng(imageBytes);
-            const scaledImage = embeddedImage.scale(0.2);
-
-            page.drawImage(embeddedImage, {
-              x: width - margin - scaledImage.width - 10,
-              y: exerciseY - 182, // Adjust Y position for the image
-              width: scaledImage.width,
-              height: scaledImage.height,
-            });
-
-            // Image border
-            page.drawRectangle({
-              x: width - margin - scaledImage.width - 11,
-              y: exerciseY - 183,
-              width: scaledImage.width + 1,
-              height: scaledImage.height + 1,
-              borderColor: rgb(0, 0, 0),
-              borderWidth: 2,
-            });
+          // Load and display the image from URL
+          const imageUrl = exercise.data.image;
+          
+          try {
+            console.log(`Attempting to fetch image from URL: ${imageUrl}`);
+            
+            // Fetch image from URL
+            const https = require('https');
+            const http = require('http');
+            
+            const fetchImage = (url) => {
+              return new Promise((resolve, reject) => {
+                const client = url.startsWith('https://') ? https : http;
+                console.log(`Using ${url.startsWith('https://') ? 'HTTPS' : 'HTTP'} client`);
+                
+                client.get(url, (response) => {
+                  console.log(`HTTP Response Status: ${response.statusCode}`);
+                  console.log(`Content-Type: ${response.headers['content-type']}`);
+                  
+                  if (response.statusCode !== 200) {
+                    reject(new Error(`Failed to fetch image: ${response.statusCode}`));
+                    return;
+                  }
+                  
+                  const chunks = [];
+                  response.on('data', (chunk) => {
+                    chunks.push(chunk);
+                    console.log(`Received chunk of size: ${chunk.length}`);
+                  });
+                  
+                  response.on('end', () => {
+                    const buffer = Buffer.concat(chunks);
+                    console.log(`Total image data received: ${buffer.length} bytes`);
+                    resolve(buffer);
+                  });
+                }).on('error', (error) => {
+                  console.error('Network error:', error);
+                  reject(error);
+                });
+              });
+            };
+            
+            const imageBytes = await fetchImage(imageUrl);
+            console.log(`Successfully fetched image, size: ${imageBytes.length} bytes`);
+            
+            let embeddedImage;
+            
+            // Detect image format from URL or content
+            const urlLower = imageUrl.toLowerCase();
+            console.log(`Analyzing URL for format: ${urlLower}`);
+            
+            try {
+              if (urlLower.includes('.png') || urlLower.includes('png')) {
+                console.log('Attempting to embed as PNG...');
+                embeddedImage = await pdfDoc.embedPng(imageBytes);
+                console.log('Successfully embedded PNG image');
+              } else if (urlLower.includes('.jpg') || urlLower.includes('.jpeg') || urlLower.includes('jpg') || urlLower.includes('jpeg')) {
+                console.log('Attempting to embed as JPEG...');
+                embeddedImage = await pdfDoc.embedJpg(imageBytes);
+                console.log('Successfully embedded JPEG image');
+              } else {
+                console.log('Format unclear from URL, trying PNG first...');
+                try {
+                  embeddedImage = await pdfDoc.embedPng(imageBytes);
+                  console.log('Successfully embedded as PNG (fallback)');
+                } catch (pngError) {
+                  console.log('PNG failed, trying JPEG...', pngError.message);
+                  embeddedImage = await pdfDoc.embedJpg(imageBytes);
+                  console.log('Successfully embedded as JPEG (fallback)');
+                }
+              }
+            } catch (embedError) {
+              console.error('Failed to embed image:', embedError.message);
+              throw embedError;
+            }
+            
+            console.log(`Image dimensions: ${embeddedImage.width} x ${embeddedImage.height}`);
+            
+            // Calculate scaled dimensions to fit within available space
+            const maxImageWidth = 150;
+            const maxImageHeight = 120;
+            const imageAspectRatio = embeddedImage.width / embeddedImage.height;
+            
+            let scaledWidth, scaledHeight;
+            
+            if (imageAspectRatio > 1) {
+              // Landscape image
+              scaledWidth = Math.min(maxImageWidth, embeddedImage.width);
+              scaledHeight = scaledWidth / imageAspectRatio;
+            } else {
+              // Portrait or square image
+              scaledHeight = Math.min(maxImageHeight, embeddedImage.height);
+              scaledWidth = scaledHeight * imageAspectRatio;
+            }
+            
+            console.log(`Scaled dimensions: ${scaledWidth} x ${scaledHeight}`);
+            
+            // Position the image on the right side, but away from table area
+            const imageX = pageWidth - margin - scaledWidth - 50;
+            let imageY = currentY;
+            
+            // If image would be too high, position it below the table
+            if (imageY + scaledHeight > pageHeight - margin - 50) {
+              imageY = currentY - scaledHeight - 20; // Position below current content
+            }
+            
+            console.log(`Image position: x=${imageX}, y=${imageY}, currentY=${currentY}`);
+            
+            // Check if image fits on current page
+            if (imageY < margin + 50) {
+              console.log('Image needs new page, creating page break...');
+              checkPageBreak(scaledHeight + 50);
+              // Recalculate Y position after potential page break
+              imageY = currentY - scaledHeight - 20;
+              console.log(`New image position after page break: y=${imageY}`);
+              
+              currentPage.drawImage(embeddedImage, {
+                x: imageX,
+                y: imageY,
+                width: scaledWidth,
+                height: scaledHeight,
+              });
+              console.log('Image drawn on new page');
+              
+              // Draw a simple border around the image for visibility
+              currentPage.drawRectangle({
+                x: imageX - 2,
+                y: imageY - 2,
+                width: scaledWidth + 4,
+                height: scaledHeight + 4,
+                borderColor: rgb(0, 0, 0),
+                borderWidth: 1,
+              });
+            } else {
+              currentPage.drawImage(embeddedImage, {
+                x: imageX,
+                y: imageY,
+                width: scaledWidth,
+                height: scaledHeight,
+              });
+              console.log('Image drawn on current page');
+              
+              // Draw a simple border around the image for visibility
+              currentPage.drawRectangle({
+                x: imageX - 2,
+                y: imageY - 2,
+                width: scaledWidth + 4,
+                height: scaledHeight + 4,
+                borderColor: rgb(0, 0, 0),
+                borderWidth: 1,
+              });
+            }
+            
+          } catch (error) {
+            console.error(`Error loading image from URL ${imageUrl}:`, error.message);
+            console.error('Full error:', error);
+            // Continue without image if there's an error
           }
+          currentY -= 20;
 
-
-          // Adjust Y position for the next exercise
-          exerciseY -= 10;
         } else if (exercise.type === 'CLT') {
           const studentScore = studentCLT.computedScore;
           const totalPoints = exercise.data.points;
+          
+          checkPageBreak(120);
 
           // Draw CLT title with student score
-          page.drawText(`${exerciseIndex + 1}- Compléter le tableau avec les mots appropriés : `, {
+          currentPage.drawText(`${exerciseIndex + 1}- Compléter le tableau avec les mots appropriés : `, {
             x: margin,
-            y: exerciseY,
+            y: currentY,
             size: 8,
             font: timesRomanFont,
             color: rgb(0, 0, 0),
           });
 
-          page.drawText(`(${studentScore} / ${totalPoints} pts)`, {
+          currentPage.drawText(`(${studentScore} / ${totalPoints} pts)`, {
             x: margin + timesRomanFont.widthOfTextAtSize(`${exerciseIndex + 1}- Compléter le tableau avec les mots appropriés : `, 8),
-            y: exerciseY,
+            y: currentY,
             size: 8,
             font: timesRomanBoldFont,
             color: rgb(1, 0, 0),
           });
+          currentY -= 15;
 
-          // Display the shuffled responses under the question
+          // Display the shuffled words
           const shuffledWords = exercise.data.shuffledWords.join(' - ');
-          exerciseY -= 10;
-          page.drawText(shuffledWords, {
-            x: (width - timesRomanFont.widthOfTextAtSize(shuffledWords, 8)) / 2,
-            y: exerciseY,
-            size: 8,
-            font: timesRomanFont,
-            color: rgb(0, 0, 0),
-          });
+          
+          const maxWidth = pageWidth - 2 * margin;
+          const centerX = (pageWidth - Math.min(timesRomanFont.widthOfTextAtSize(shuffledWords, 8), maxWidth)) / 2;
+          
+          currentY = drawWrappedText(shuffledWords, centerX, currentY, maxWidth, timesRomanFont, 8, rgb(0, 0, 0), currentPage);
+          currentY -= 15;
 
-          // Create the table for column names and formatted words
+          // Create the table
           const columnNames = exercise.data.columnNames;
           const numColumns = columnNames.length;
-          const tableWidth = width - 2 * margin;
+          const tableWidth = pageWidth - 2 * margin;
           const cellWidth = tableWidth / numColumns;
 
-          exerciseY -= 25; // Adjust Y position for the table
-
-          // Draw the first row (columnNames)
+          // Draw column headers
           let currentX = margin;
           columnNames.forEach((columnName) => {
-            page.drawText(columnName, {
-              x: currentX + (cellWidth - timesRomanFont.widthOfTextAtSize(columnName, 10)) / 2,
-              y: exerciseY + (15 / 2),
+            currentPage.drawText(columnName, {
+              x: currentX + (cellWidth - timesRomanFont.widthOfTextAtSize(columnName, 8)) / 2,
+              y: currentY + 7,
               size: 8,
               font: timesRomanFont,
               color: rgb(0, 0, 0),
             });
 
-            // Draw cell borders
-            page.drawRectangle({
+            currentPage.drawRectangle({
               x: currentX,
-              y: exerciseY + 3,
+              y: currentY,
               width: cellWidth,
               height: 15,
               borderColor: rgb(0, 0, 0),
               borderWidth: 2,
             });
 
-            currentX += cellWidth; // Move to next column
+            currentX += cellWidth;
           });
+          currentY -= 45;
 
-          // Move to the next row for formattedWords
-          exerciseY -= 30;
+          // Draw table content with proper word-level text wrapping within cells
           currentX = margin;
-
-          columnNames.forEach(header => {
+          let maxCellHeight = 150;
+          currentY -= maxCellHeight;
+          
+          console.log(`Drawing CLT table with ${columnNames.length} columns`);
+          
+          const cellContents = [];
+          
+          // First pass: calculate content and required heights for all cells
+          columnNames.forEach((header, headerIndex) => {
             const correctWords = exercise.data.correctAnswers[header] || [];
             const studentWords = studentCLT.formattedWords[header] || [];
-            let wordX = currentX + 5;
-
-            studentWords.forEach((word, wordIndex) => {
-
-              if (correctWords.includes(word)) {
-                page.drawText(word, {
-                  x: wordX,
-                  y: exerciseY + 22,
-                  size: 8,
-                  font: timesRomanFont,
-                  color: rgb(0, 1, 0), // Green for correct
-                });
-              } else {
-                page.drawText(word, {
-                  x: wordX,
-                  y: exerciseY + 22,
-                  size: 8,
-                  font: timesRomanFont,
-                  color: rgb(1, 0, 0), // Red for incorrect
+            
+            console.log(`Processing column "${header}" with ${studentWords.length} words:`, studentWords);
+            
+            // Process each student word/phrase separately
+            const allLines = [];
+            
+            studentWords.forEach((phrase, phraseIndex) => {
+              const isCorrect = correctWords.includes(phrase);
+              const phraseColor = isCorrect ? rgb(0, 1, 0) : rgb(1, 0, 0);
+              
+              // Break phrase into individual words for wrapping
+              const words = phrase.split(' ');
+              const maxCellWidth = cellWidth - 10; // 10px padding
+              
+              let currentLine = [];
+              let currentLineWidth = 0;
+              
+              words.forEach((word, wordIndex) => {
+                const wordWidth = timesRomanFont.widthOfTextAtSize(word + ' ', 8);
+                
+                // Check if adding this word would exceed the line width
+                if (currentLineWidth + wordWidth > maxCellWidth && currentLine.length > 0) {
+                  // Complete current line
+                  allLines.push({
+                    segments: [...currentLine],
+                    width: currentLineWidth
+                  });
+                  
+                  // Start new line with current word
+                  currentLine = [{
+                    text: word,
+                    color: phraseColor,
+                    width: timesRomanFont.widthOfTextAtSize(word, 8)
+                  }];
+                  currentLineWidth = timesRomanFont.widthOfTextAtSize(word, 8);
+                } else {
+                  // Add word to current line
+                  currentLine.push({
+                    text: word,
+                    color: phraseColor,
+                    width: timesRomanFont.widthOfTextAtSize(word, 8)
+                  });
+                  currentLineWidth += wordWidth;
+                }
+                
+                // Add space if not the last word in the phrase
+                if (wordIndex < words.length - 1) {
+                  currentLine.push({
+                    text: ' ',
+                    color: phraseColor,
+                    width: timesRomanFont.widthOfTextAtSize(' ', 8)
+                  });
+                }
+              });
+              
+              // Add remaining line if it has content
+              if (currentLine.length > 0) {
+                allLines.push({
+                  segments: [...currentLine],
+                  width: currentLineWidth
                 });
               }
-
-              wordX += timesRomanFont.widthOfTextAtSize(word, 8);
-
-              // Draw separator if not the last word
-              if (wordIndex !== studentWords.length - 1) {
-                page.drawText(' - ', {
-                  x: wordX,
-                  y: exerciseY + 22,
-                  size: 8,
-                  font: timesRomanFont,
-                  color: rgb(0, 0, 0),
+              
+              // Add separator line if not the last phrase
+              if (phraseIndex < studentWords.length - 1) {
+                allLines.push({
+                  segments: [{
+                    text: ' - ',
+                    color: rgb(0, 0, 0),
+                    width: timesRomanFont.widthOfTextAtSize(' - ', 8)
+                  }],
+                  width: timesRomanFont.widthOfTextAtSize(' - ', 8)
                 });
-                wordX += timesRomanFont.widthOfTextAtSize(' - ', 8);
               }
             });
-
-            // Draw borders for each cell
-            page.drawRectangle({
-              x: currentX,
-              y: exerciseY + 3,
-              width: cellWidth,
-              height: 30,
-              borderColor: rgb(0, 0, 0),
-              borderWidth: 2,
+            
+            console.log(`Column "${header}" will have ${allLines.length} lines`);
+            
+            // Calculate required height
+            const lineHeight = 12;
+            const paddingTop = 8;
+            const paddingBottom = 8;
+            const requiredHeight = Math.max(30, allLines.length * lineHeight + paddingTop + paddingBottom);
+            
+            maxCellHeight = Math.max(maxCellHeight, requiredHeight);
+            console.log(`Required height for column "${header}": ${requiredHeight}px`);
+            
+            cellContents.push({
+              lines: allLines,
+              requiredHeight,
+              header
             });
-
-            currentX += cellWidth; // Move to the next column
           });
+          
+          console.log(`Final table row height: ${maxCellHeight}px`);
+          
+          // Second pass: draw all cells with uniform height
+          currentX = margin;
+          cellContents.forEach((cellContent, cellIndex) => {
+            const header = cellContent.header;
+            console.log(`Drawing cell ${cellIndex} for column "${header}"`);
+            
+            const cellStartX = currentX;
+            const cellStartY = currentY;
+            
+            // Calculate text starting position
+            const paddingLeft = 5;
+            const paddingTop = 8;
+            let textY = cellStartY + maxCellHeight - paddingTop;
+            const lineHeight = 12;
+            
+            // Draw each line of wrapped text
+            cellContent.lines.forEach((line, lineIndex) => {
+              let lineX = cellStartX + paddingLeft;
+              console.log(`Drawing line ${lineIndex} at y=${textY}`);
+              
+              line.segments.forEach((segment, segmentIndex) => {
+                const maxTextX = cellStartX + cellWidth - 5; // 5px right padding
+                
+                if (lineX + segment.width <= maxTextX) {
+                  currentPage.drawText(segment.text, {
+                    x: lineX,
+                    y: textY,
+                    size: 8,
+                    font: timesRomanFont,
+                    color: segment.color,
+                  });
+                  
+                  lineX += segment.width;
+                  console.log(`Drew segment "${segment.text}" at x=${lineX - segment.width}`);
+                } else {
+                  console.log(`Segment "${segment.text}" would exceed cell boundary, truncating or skipping`);
+                }
+              });
+              
+              textY -= lineHeight;
+            });
 
-          // Adjust Y position for the next content
-          exerciseY -= 15;
+            // Draw cell border
+            currentPage.drawRectangle({
+              x: cellStartX,
+              y: cellStartY,
+              width: cellWidth,
+              height: maxCellHeight,
+              borderColor: rgb(0, 0, 0),
+              borderWidth: 1,
+            });
+
+            console.log(`Drew cell border: x=${cellStartX}, y=${cellStartY}, w=${cellWidth}, h=${maxCellHeight}`);
+            currentX += cellWidth;
+          });
+          
+          currentY -= maxCellHeight + 10;
+          console.log(`Table completed, currentY now: ${currentY}`);
+
         } else if (exercise.type === 'RPF') {
-          exerciseY -= 77;
           const studentScore = studentRPF.computedScore;
           const totalPoints = exercise.data.points;
           const { textLeft, textRight, correctAnswers } = exercise.data;
           const { studentAnswers } = studentRPF;
+          
+          const itemsCount = textLeft.length;
+          const requiredSpace = 50 + (itemsCount * 12);
+          checkPageBreak(requiredSpace);
 
           // Draw RPF title with student score
-          page.drawText(`${exerciseIndex + 1}- Relier par une flèche : `, {
+          currentPage.drawText(`${exerciseIndex + 1}- Relier par une flèche : `, {
             x: margin,
-            y: exerciseY,
+            y: currentY,
             size: 8,
             font: timesRomanFont,
             color: rgb(0, 0, 0),
           });
 
-          page.drawText(`(${studentScore} / ${totalPoints} pts)`, {
+          currentPage.drawText(`(${studentScore} / ${totalPoints} pts)`, {
             x: margin + timesRomanFont.widthOfTextAtSize(`${exerciseIndex + 1}- Relier par une flèche : `, 8),
-            y: exerciseY,
+            y: currentY,
             size: 8,
             font: timesRomanBoldFont,
             color: rgb(1, 0, 0),
           });
+          currentY -= 15;
 
-          // Calculate the total width for textLeft and textRight (70% of the page width)
-          const contentWidth = width * 0.7;
-          const leftRightWidth = contentWidth / 2; // Divide the 70% width equally between left and right
+          const contentWidth = pageWidth * 0.7;
+          const leftRightWidth = contentWidth / 2;
+          const centerX = (pageWidth - contentWidth) / 2;
+          const leftX = centerX;
+          const rightX = centerX + leftRightWidth;
 
-          // Center the content by calculating the starting X position
-          const centerX = (width - contentWidth) / 2;
-          const leftX = centerX; // Starting X position for textLeft
-          const rightX = centerX + leftRightWidth; // Starting X position for textRight
-
-          let itemY = exerciseY - 10; // Start position for items
-
-          // Lists to hold the (x, y) coordinates of the left and right items
           const leftCoords = [];
           const rightCoords = [];
 
-          // Loop through the textLeft and textRight arrays to display items and draw connecting lines
           textLeft.forEach((leftText, index) => {
-            // Calculate width of the left text
             const leftTextWidth = timesRomanFont.widthOfTextAtSize(`${leftText} •`, 8);
 
-            // Draw left text with bullets (aligned to the right)
-            page.drawText(`${leftText} •`, {
-              x: leftX + 30 - leftTextWidth,  // Right-align by adjusting X position
-              y: itemY,
+            currentPage.drawText(`${leftText} •`, {
+              x: leftX + 30 - leftTextWidth,
+              y: currentY,
               size: 8,
               font: timesRomanFont,
               color: rgb(0, 0, 0),
             });
 
-            // Store coordinates for the left item
-            leftCoords.push({ x: leftX + 30 - 5, y: itemY - 2 });
+            leftCoords.push({ x: leftX + 30 - 5, y: currentY - 2 });
 
-            // Draw right text with bullets
             const rightText = textRight[index];
-            page.drawText(`• ${rightText}`, {
+            currentPage.drawText(`• ${rightText}`, {
               x: rightX,
-              y: itemY,
+              y: currentY,
               size: 8,
               font: timesRomanFont,
               color: rgb(0, 0, 0),
             });
 
-            // Store coordinates for the right item
-            rightCoords.push({ x: rightX + 5, y: itemY - 2 });
+            rightCoords.push({ x: rightX + 5, y: currentY - 2 });
 
-            itemY -= 10; // Adjust Y position for the next row
+            currentY -= 12;
           });
 
-          // Draw lines connecting left and right items based on studentAnswers
+          // Draw connection lines
           Object.entries(studentAnswers).forEach(([leftTerm, rightTerm]) => {
-            // Find the index of the left term and the right term
             const leftIndex = textLeft.indexOf(leftTerm);
             const rightIndex = textRight.indexOf(rightTerm);
 
             if (leftIndex !== -1 && rightIndex !== -1) {
               const leftCoord = leftCoords[leftIndex];
               const rightCoord = rightCoords[rightIndex];
-
-              // Determine the line color based on correctness
               const lineColor = correctAnswers[leftTerm] === rightTerm ? rgb(0, 1, 0) : rgb(1, 0, 0);
 
-              // Draw line connecting left and right items
-              page.drawLine({
-                start: { x: leftCoord.x + 5, y: leftCoord.y + 5 },  // Adjust position for the line
+              currentPage.drawLine({
+                start: { x: leftCoord.x + 5, y: leftCoord.y + 5 },
                 end: { x: rightCoord.x - 5, y: rightCoord.y + 5 },
                 thickness: 1,
                 color: lineColor,
               });
             }
           });
-          exerciseY -= 15
+          currentY -= 20;
+
         } else if (exercise.type === 'RLV') {
           const studentScore = studentRLV.computedScore;
           const totalPoints = exercise.data.points;
+          
+          const phrasesCount = exercise.data.phrases.length;
+          const requiredSpace = 50 + (phrasesCount * 15);
+          checkPageBreak(requiredSpace);
 
           // Draw RLV title with student score
-          page.drawText(`${exerciseIndex + 1}- Remplir convenablement le vide avec les mots suivants :`, {
+          currentPage.drawText(`${exerciseIndex + 1}- Remplir convenablement le vide avec les mots suivants :`, {
             x: margin,
-            y: exerciseY,
+            y: currentY,
             size: 8,
             font: timesRomanFont,
             color: rgb(0, 0, 0),
           });
 
-          // Draw score next to title
-          page.drawText(`(${studentScore} / ${totalPoints} pts)`, {
+          currentPage.drawText(`(${studentScore} / ${totalPoints} pts)`, {
             x: margin + timesRomanFont.widthOfTextAtSize(`${exerciseIndex + 1}- Remplir convenablement le vide avec les mots suivants : `, 8),
-            y: exerciseY,
+            y: currentY,
             size: 8,
             font: timesRomanBoldFont,
             color: rgb(1, 0, 0),
           });
-
-          exerciseY -= 10;  // Adjust vertical position for the next element
+          currentY -= 15;
 
           // Display the shuffled words
-          page.drawText(exercise.data.shuffledWords.join(' - '), {
-            x: (width - timesRomanFont.widthOfTextAtSize(exercise.data.shuffledWords.join(' - '), 8)) / 2,
-            y: exerciseY,
-            size: 8,
-            font: timesRomanFont,
-            color: rgb(0, 0, 0),
-          });
+          const shuffledWordsText = exercise.data.shuffledWords.join(' - ');
+          
+          const maxWidth = pageWidth - 2 * margin;
+          const centerX = (pageWidth - Math.min(timesRomanFont.widthOfTextAtSize(shuffledWordsText, 8), maxWidth)) / 2;
+          
+          currentY = drawWrappedText(shuffledWordsText, centerX, currentY, maxWidth, timesRomanFont, 8, rgb(0, 0, 0), currentPage);
+          currentY -= 10;
 
-          exerciseY -= 10;  // Adjust for the phrases
-
-          // Loop through each phrase and add the student answers
+          // Process phrases
           exercise.data.phrases.forEach((phrase, phraseIndex) => {
             const splitPhrase = phrase.split(' ');
             let phraseX = margin;
-            // Add the alphabet label (a), b), c), etc.)
+            
             const label = String.fromCharCode(97 + phraseIndex) + ') ';
-            page.drawText(label, {
+            currentPage.drawText(label, {
               x: phraseX,
-              y: exerciseY,
+              y: currentY,
               size: 8,
               font: timesRomanFont,
               color: rgb(0, 0, 0),
             });
-            phraseX += timesRomanFont.widthOfTextAtSize(String.fromCharCode(97 + phraseIndex) + ') ', 8)
+            phraseX += timesRomanFont.widthOfTextAtSize(label, 8);
 
-            // Rebuild the phrase, replacing "................." with student answers
             let answerColors = [];
             splitPhrase.forEach((word, wordIndex) => {
-              let answerColor = rgb(0, 0, 0)
+              let answerColor = rgb(0, 0, 0);
+              
               if (word === '.................') {
                 const answerEntry = studentRLV.studentAnswers.find(
                   entry => entry.phraseIndex === phraseIndex && entry.wordIndex === wordIndex
                 );
                 const studentAnswer = (answerEntry && answerEntry.answer !== '') ? answerEntry.answer : '.................';
+                
                 studentRLV.studentAnswers.forEach(({ phraseIndex, wordIndex, answer }, index) => {
                   if (answerColors.length < studentRLV.studentAnswers.length) {
                     if (answer !== '') {
@@ -679,24 +990,23 @@ async function createPDF({ examName, module, niveau, note, school, className, ye
                     }
                   }
                 });
-                // Find the color for the given wordIndex
+                
                 const colorObj = answerColors.find(a => a.wordIndex === wordIndex);
-                const color = colorObj ? colorObj.answerColor : rgb(0, 0, 0); // Default to black if no color found
+                const color = colorObj ? colorObj.answerColor : rgb(0, 0, 0);
 
-                // Add the student's answer with color coding
-                page.drawText(`${studentAnswer} `, {
+                currentPage.drawText(`${studentAnswer} `, {
                   x: phraseX,
-                  y: exerciseY,
+                  y: currentY,
                   size: 8,
                   font: timesRomanFont,
-                  color: color, // Use the found color
+                  color: color,
                 });
 
                 phraseX += timesRomanFont.widthOfTextAtSize(`${studentAnswer} `, 8);
               } else {
-                page.drawText(`${word} `, {
+                currentPage.drawText(`${word} `, {
                   x: phraseX,
-                  y: exerciseY,
+                  y: currentY,
                   size: 8,
                   font: timesRomanFont,
                   color: rgb(0, 0, 0),
@@ -704,185 +1014,179 @@ async function createPDF({ examName, module, niveau, note, school, className, ye
                 phraseX += timesRomanFont.widthOfTextAtSize(`${word} `, 8);
               }
             });
-            exerciseY -= 13;  // Adjust vertical space for the next phrase
+            currentY -= 15;
           });
+
         } else if (exercise.type === 'RLE') {
-          exerciseY -= 60;
           const studentScore = studentRLE.computedScore;
           const totalPoints = exercise.data.points;
+          
+          const linesCount = exercise.data.text.split('\n').length;
+          const requiredSpace = 50 + (linesCount * 18);
+          checkPageBreak(requiredSpace);
 
-          // Draw RLV title with student score
-          page.drawText(`${exerciseIndex + 1}- Remplir les entrées avec vos réponses :`, {
+          // Draw RLE title with student score
+          currentPage.drawText(`${exerciseIndex + 1}- Remplir les entrées avec vos réponses :`, {
             x: margin,
-            y: exerciseY,
+            y: currentY,
             size: 8,
             font: timesRomanFont,
             color: rgb(0, 0, 0),
           });
 
-          // Draw score next to title
-          page.drawText(`(${studentScore} / ${totalPoints} pts)`, {
+          currentPage.drawText(`(${studentScore} / ${totalPoints} pts)`, {
             x: margin + timesRomanFont.widthOfTextAtSize(`${exerciseIndex + 1}- Remplir les entrées avec vos réponses : `, 8),
-            y: exerciseY,
+            y: currentY,
             size: 8,
             font: timesRomanBoldFont,
             color: rgb(1, 0, 0),
           });
+          currentY -= 20;
 
-          exerciseY -= 15;
           exercise.data.text.split('\n').map((line, lineIndex) => {
-            let phraseX = margin
-            // Add the alphabet label (a), b), c), etc.)
+            let phraseX = margin;
+            
             const label = String.fromCharCode(97 + lineIndex) + ') ';
-            page.drawText(label, {
+            currentPage.drawText(label, {
               x: phraseX,
-              y: exerciseY,
+              y: currentY,
               size: 8,
               font: timesRomanFont,
               color: rgb(0, 0, 0),
             });
-            phraseX += timesRomanFont.widthOfTextAtSize(String.fromCharCode(97 + lineIndex) + ') ', 8)
+            phraseX += timesRomanFont.widthOfTextAtSize(label, 8);
 
             line.split(/(\{.*?\})/g).map((part) => {
               if (part.match(/^\{.*?\}$/)) {
                 let answerColor = rgb(0, 0, 0);
+                
                 if (studentRLE.studentAnswers[lineIndex] !== '') {
-
                   if (studentRLE.studentAnswers[lineIndex] === exercise.data.correctAnswers[lineIndex]) {
                     answerColor = rgb(0, 1, 0);
                   } else {
-                    answerColor = rgb(1, 0, 0)
+                    answerColor = rgb(1, 0, 0);
                   }
 
-                  page.drawText(`${studentRLE.studentAnswers[lineIndex]}`, {
+                  currentPage.drawText(`${studentRLE.studentAnswers[lineIndex]}`, {
                     x: phraseX,
-                    y: exerciseY,
+                    y: currentY,
                     size: 8,
                     font: customFont,
                     color: answerColor,
                   });
-                  phraseX += customFont.widthOfTextAtSize(`${studentRLE.studentAnswers[lineIndex]}`, 8)
+                  phraseX += customFont.widthOfTextAtSize(`${studentRLE.studentAnswers[lineIndex]}`, 8);
                 } else {
-                  page.drawText('.................', {
+                  currentPage.drawText('.................', {
                     x: phraseX,
-                    y: exerciseY,
+                    y: currentY,
                     size: 8,
                     font: customFont,
                     color: answerColor,
                   });
-                  phraseX += customFont.widthOfTextAtSize('.................', 8)
+                  phraseX += customFont.widthOfTextAtSize('.................', 8);
                 }
               } else {
-                page.drawText(`${part}`, {
+                currentPage.drawText(`${part}`, {
                   x: phraseX,
-                  y: exerciseY,
+                  y: currentY,
                   size: 8,
                   font: customFont,
                   color: rgb(0, 0, 0),
                 });
-                phraseX += customFont.widthOfTextAtSize(`${part}`, 8)
+                phraseX += customFont.widthOfTextAtSize(`${part}`, 8);
               }
+            });
+            currentY -= 18;
+          });
 
-            })
-            exerciseY -= 15;
-          })
         } else if (exercise.type === 'OLE') {
-          exerciseY -= 120;
           const studentScore = studentOLE.computedScore;
           const totalPoints = exercise.data.points;
+          
+          // Calculate required space based on questions and steps
+          let totalSteps = 0;
+          exercise.data.questions.forEach(q => totalSteps += q.steps.length);
+          const requiredSpace = 50 + (exercise.data.questions.length * 15) + (totalSteps * 12);
+          checkPageBreak(requiredSpace);
 
           // Draw OLE title with student score
-          page.drawText(`${exerciseIndex + 1}- Ordonner les étapes pour répondre correctement aux questions :`, {
+          currentPage.drawText(`${exerciseIndex + 1}- Ordonner les étapes pour répondre correctement aux questions :`, {
             x: margin,
-            y: exerciseY,
+            y: currentY,
             size: 8,
             font: timesRomanFont,
             color: rgb(0, 0, 0),
           });
 
-          // Draw score next to title
           const titleWidth = timesRomanFont.widthOfTextAtSize(`${exerciseIndex + 1}- Ordonner les étapes pour répondre correctement aux questions :`, 8);
-          page.drawText(`(${studentScore} / ${totalPoints} pts)`, {
+          currentPage.drawText(`(${studentScore} / ${totalPoints} pts)`, {
             x: margin + titleWidth + 5,
-            y: exerciseY,
+            y: currentY,
             size: 8,
             font: timesRomanBoldFont,
             color: rgb(1, 0, 0),
           });
+          currentY -= 15;
 
-          exerciseY -= 12; // Adjust Y position for the next section
-
-          // Loop through the questions
+          // Process questions
           exercise.data.questions.forEach((question, questionIndex) => {
             const studentAnswer = studentOLE.studentAnswers.find(ans => ans.id === question.id);
 
             // Draw the question
-            page.drawText(`${String.fromCharCode(97 + questionIndex)}) ${question.question} : `, {
+            currentPage.drawText(`${String.fromCharCode(97 + questionIndex)}) ${question.question} : `, {
               x: margin,
-              y: exerciseY,
+              y: currentY,
               size: 8,
               font: timesRomanFont,
               color: rgb(0, 0, 0),
             });
 
-            page.drawText(`(${studentAnswer.questionScore} / ${question.points} pts)`, {
+            currentPage.drawText(`(${studentAnswer.questionScore} / ${question.points} pts)`, {
               x: margin + timesRomanFont.widthOfTextAtSize(`${String.fromCharCode(97 + questionIndex)}) ${question.question} : `, 8),
-              y: exerciseY,
+              y: currentY,
               size: 8,
               font: timesRomanBoldFont,
               color: rgb(1, 0, 0),
             });
+            currentY -= 12;
 
-            exerciseY -= 10; // Adjust Y position for the steps
-
-            // Loop through the student's shuffled steps and compare with correct steps
+            // Process steps
             studentAnswer.shuffledSteps.forEach((step, stepIndex) => {
               const correctStep = question.steps[stepIndex];
-
-              // Determine the color (green if correct, red if not)
               const stepColor = step === correctStep ? rgb(0, 1, 0) : rgb(1, 0, 0);
 
-              // Draw the step text
-              page.drawText(`é${stepIndex + 1}: `, {
-                x: margin + 15,  // Indent the steps
-                y: exerciseY,
+              currentPage.drawText(`é${stepIndex + 1}: `, {
+                x: margin + 15,
+                y: currentY,
                 size: 8,
                 font: timesRomanBoldFont,
                 color: rgb(0, 0, 0),
               });
 
-              page.drawText(`${step}`, {
-                x: margin + 15 + timesRomanBoldFont.widthOfTextAtSize(`é${stepIndex + 1}: `, 8),  // Indent the steps
-                y: exerciseY,
+              currentPage.drawText(`${step}`, {
+                x: margin + 15 + timesRomanBoldFont.widthOfTextAtSize(`é${stepIndex + 1}: `, 8),
+                y: currentY,
                 size: 8,
                 font: customFont,
                 color: stepColor,
               });
 
-              exerciseY -= 10; // Adjust Y position for the next step
+              currentY -= 12;
             });
 
-            exerciseY -= 2; // Extra spacing between questions
+            currentY -= 5; // Extra spacing between questions
           });
         }
 
-
-
-
-
-
-
-        // Update currentY for the next exercise or party
-        currentY = exerciseY + 120;
+        // Add spacing after each exercise
+        currentY -= 15;
       });
 
-      /// Adjust spacing only if more parties follow, avoiding too much space between them
-      if (partyIndex === 1) {
-        currentY -= 345;
+      // Add spacing between parties (but not after the last one)
+      if (partyIndex < parties.length - 1) {
+        currentY -= 20;
       }
     });
-
-    console.log('PDF generation finished, uploading...');
 
     // Save PDF to Google Cloud Storage
     const pdfFileName = `${number}- ${lastName} ${firstName}.pdf`;
