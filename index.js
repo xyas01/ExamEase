@@ -63,7 +63,7 @@ app.post('/api/create-document', async (req, res) => {
       return res.status(400).send('Missing required field: module');
     }
     
-    if (!note) {
+    if (note === undefined || note === null) {
       return res.status(400).send('Missing required field: note');
     }
     if (!school) {
