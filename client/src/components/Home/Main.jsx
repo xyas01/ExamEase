@@ -95,7 +95,7 @@ const Main = ({ userRole }) => {
   };
 
   return (
-    <main className="relative flex flex-col items-center h-screen overflow-hidden p-4">
+    <main className="relative flex flex-col items-center p-4">
       {exams.length === 0 ? (
         <p className="text-lg text-gray-700 text-center">
           Aucun examen disponible pour le moment.
